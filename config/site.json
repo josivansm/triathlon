@@ -16,7 +16,16 @@
     "citacao": null,
     "assinatura": "Manaus · Equipe Unity · 2026"
   },
-  "provas_concluidas": [],
+  "provas_concluidas": [
+    {
+      "data": "2026-11-15",
+      "prova": "Circuito das Estações 2026",
+      "local": "Ponta Negra, Manaus",
+      "distancia": "5K",
+      "tempo": "21:58",
+      "destaque": "Tempo do relógio (4,91 km). O relógio da chegada marcava 22:27, contando da largada geral."
+    }
+  ],
   "meta_sono": 7,
   "fotos": [
     {
