@@ -480,14 +480,92 @@
     }));
   }
 
+  // ---------- calendário semanal ----------
+  const DIAS_SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+  const ROTULO = { Run: 'Corrida', Ride: 'Bike', Swim: 'Natação', Strength: 'Musculação', Other: 'Outro' };
+  const semanaISO = (iso) => {
+    const d = utc(iso); d.setUTCDate(d.getUTCDate() + 3 - ((d.getUTCDay() + 6) % 7));
+    const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    return 1 + Math.round(((d - jan4) / 864e5 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
+  };
+  const distTxt = (a) => !a.distancia_km ? null : a.tipo === 'Swim' ? fmt(a.distancia_km * 1000) + ' m' : fmt(a.distancia_km, 1) + ' km';
+
+  function cartaoTreino(a) {
+    const tipo = ROTULO[a.tipo] ? a.tipo : 'Other';
+    return el('article', { class: 'treino t-' + tipo },
+      el('header', {}, el('span', { class: 'esp', text: ROTULO[tipo] }), el('b', { text: horas(a.tempo_min) }), distTxt(a) ? el('span', { class: 'dist', text: distTxt(a) }) : null),
+      el('div', { class: 'det' },
+        a.fc_media ? el('span', {}, el('b', { text: String(a.fc_media) }), ' bpm') : null,
+        a.distancia_km && tipo !== 'Strength' ? el('span', { text: ritmo(a) }) : null,
+        a.carga != null ? el('span', { text: 'Carga ' + a.carga }) : null),
+      el('p', { class: 'nome', text: a.nome }));
+  }
+
+  function paginaCalendario(ctx) {
+    const { atividades, bemEstar } = ctx, h = hojeISO();
+    const porDia = d3.group(atividades, (a) => a.data);
+    const be = new Map(bemEstar.map((w) => [w.data, w]));
+    const primeira = atividades.length ? segunda(atividades[0].data) : segunda(h);
+    const frag = document.createDocumentFragment();
+    frag.append(el('h1', { class: 'titulo', text: 'Calendário' }));
+    frag.append(el('p', { class: 'sub', text: 'Semana a semana, do mais recente para o mais antigo. Cada dia mostra a noite anterior (sono, HRV e FC de repouso) e os treinos.' }));
+    const lista = el('div', { class: 'calendario' });
+    const mais = el('button', { type: 'button', class: 'filtro mais', text: 'Mostrar semanas anteriores' });
+    let proxima = segunda(h);
+    const POR_VEZ = 6;
+
+    const semana = (seg) => {
+      const dias = [...Array(7)].map((_, i) => somaDias(seg, i));
+      const doSem = dias.flatMap((d) => porDia.get(d) || []);
+      const ultimoBE = dias.map((d) => be.get(d)).filter((w) => w && w.ctl != null).pop();
+      const porEsporte = ['Ride', 'Run', 'Swim', 'Strength', 'Other'].map((t) => {
+        const l = doSem.filter((a) => (ROTULO[a.tipo] ? a.tipo : 'Other') === t);
+        return { t, l, min: soma(l, (a) => a.tempo_min), km: soma(l, (a) => a.distancia_km), carga: soma(l, (a) => a.carga) };
+      }).filter((x) => x.l.length);
+      const resumo = el('aside', { class: 'sem-resumo' },
+        el('h3', {}, 'Sem. ' + semanaISO(seg), el('small', { text: dataCurta(seg) + ' a ' + dataCurta(dias[6]) })),
+        el('dl', {},
+          el('div', {}, el('dt', { text: 'Total' }), el('dd', { text: horas(soma(doSem, (a) => a.tempo_min)) })),
+          el('div', {}, el('dt', { text: 'Carga' }), el('dd', { text: fmt(soma(doSem, (a) => a.carga)) })),
+          el('div', {}, el('dt', { text: 'Distância' }), el('dd', { text: fmt(soma(doSem, (a) => a.distancia_km), 1) + ' km' })),
+          ultimoBE ? el('div', {}, el('dt', { text: 'Forma' }), el('dd', { text: fmt(ultimoBE.ctl - ultimoBE.atl) })) : null,
+          ultimoBE ? el('div', {}, el('dt', { text: 'Fitness' }), el('dd', { text: fmt(ultimoBE.ctl) })) : null,
+          ultimoBE ? el('div', {}, el('dt', { text: 'Fadiga' }), el('dd', { text: fmt(ultimoBE.atl) })) : null),
+        porEsporte.length ? el('table', { class: 'sem-esportes' },
+          el('tbody', {}, porEsporte.map((x) => el('tr', {}, el('td', { text: ROTULO[x.t] }), el('td', { class: 'n', text: horas(x.min) }),
+            el('td', { class: 'n', text: x.km ? fmt(x.km, x.t === 'Swim' ? 1 : 0) + ' km' : '—' }), el('td', { class: 'n', text: x.carga ? String(Math.round(x.carga)) : '—' }))))) : null);
+      const grade = el('div', { class: 'sem-dias' }, dias.map((d, i) => {
+        const w = be.get(d), treinos = porDia.get(d) || [];
+        const bem = w && (w.sono_h || w.hrv || w.fc_repouso) ? el('div', { class: 'bem' },
+          w.sono_h ? el('span', { title: 'Sono' }, '☾ ', horas(w.sono_h * 60)) : null,
+          w.hrv ? el('span', { title: 'HRV' }, '♥ ', fmt(w.hrv), ' ms') : null,
+          w.fc_repouso ? el('span', { title: 'FC de repouso' }, fmt(w.fc_repouso), ' bpm') : null) : null;
+        return el('div', { class: 'dia' + (d === h ? ' hoje' : '') + (d > h ? ' futuro' : '') + (!treinos.length && !bem ? ' sem-nada' : '') },
+          el('div', { class: 'dia-cab' }, el('span', { class: 'dn', text: DIAS_SEMANA[i] }), ' ', dataCurta(d)),
+          bem, treinos.map(cartaoTreino));
+      }));
+      return el('section', { class: 'semana' }, resumo, grade);
+    };
+
+    const carregarMais = () => {
+      for (let i = 0; i < POR_VEZ && proxima >= primeira; i++) { lista.append(semana(proxima)); proxima = somaDias(proxima, -7); }
+      mais.hidden = proxima < primeira;
+    };
+    mais.onclick = carregarMais;
+    carregarMais();
+    frag.append(lista, mais);
+    $('#conteudo').replaceChildren(frag);
+  }
+
   // ---------- navegação ----------
   function rotear(ctx) {
     desenhos = [];
     const alvo = location.hash.slice(1);
     const prova = ctx.provas.find((p) => 'prova-' + p.id === alvo);
-    const atual = prova ? alvo : alvo === 'recuperacao' ? 'recuperacao' : 'inicio';
+    const atual = prova ? alvo : ['recuperacao', 'calendario'].includes(alvo) ? alvo : 'inicio';
     document.querySelectorAll('#abas a').forEach((a) => { if (a.getAttribute('href') === '#' + atual) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (prova) { document.title = prova.nome + ' · ' + ctx.site.nome; paginaProva(ctx, prova); }
+    else if (atual === 'calendario') { document.title = 'Calendário · ' + ctx.site.nome; paginaCalendario(ctx); }
     else if (atual === 'recuperacao') { document.title = 'Recuperação · ' + ctx.site.nome; paginaRecuperacao(ctx); }
     else { document.title = ctx.site.nome; paginaInicio(ctx); }
     window.scrollTo(0, 0);
@@ -507,6 +585,7 @@
       const ativas = provas.filter((p) => p.data >= h || diasEntre(p.data, h) <= 30).sort((a, b) => a.data.localeCompare(b.data));
       $('#abas').replaceChildren(
         el('a', { href: '#inicio', text: 'Início' }),
+        el('a', { href: '#calendario', text: 'Calendário' }),
         ...ativas.map((p) => el('a', { href: '#prova-' + p.id, text: p.nome.replace(/^IRONMAN /i, '') })),
         el('a', { href: '#recuperacao', text: 'Recuperação' }));
       if (meta.exemplo) { $('#aviso').hidden = false; $('#aviso').textContent = 'Estes são dados de exemplo. Eles serão trocados pelos seus na primeira sincronização com o Intervals.icu.'; }

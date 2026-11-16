@@ -137,3 +137,49 @@ td.n,th.n{text-align:right}
 .ritmos tr.total td{border-top:2px solid var(--branco);border-bottom:none;font-weight:700}
 .ritmos tr.total td b{font-size:26px}
 .meta-tempo .quando{font-size:14px}
+
+/* calendário semanal */
+.calendario{display:grid;gap:18px;margin-top:clamp(28px,5vw,48px);width:min(1400px,calc(100vw - 48px));position:relative;left:50%;transform:translateX(-50%)}
+.semana{display:grid;grid-template-columns:230px 1fr;border-top:2px solid var(--branco)}
+.sem-resumo{padding:12px 14px 14px 0;font-size:13px}
+.sem-resumo h3{margin:0 0 8px;font-stretch:75%;font-weight:800;font-size:22px;display:flex;flex-direction:column}
+.sem-resumo h3 small{font-size:12px;font-weight:500;font-stretch:100%;color:var(--cinza-3)}
+.sem-resumo dl{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:0}
+.sem-resumo dd{white-space:nowrap}
+.sem-resumo dl div{display:flex;justify-content:space-between;gap:6px}
+.sem-resumo dt{color:var(--cinza-3)}
+.sem-resumo dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.sem-esportes{margin-top:10px;font-size:12px}
+.sem-esportes td{padding:4px 6px 4px 0;border-bottom:1px solid var(--cinza-1)}
+.sem-dias{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding-top:10px}
+.dia{min-height:120px;display:flex;flex-direction:column;gap:6px;padding:6px;background:#0b0b0b;border:1px solid var(--cinza-1)}
+.dia.hoje{border-color:var(--branco)}
+.dia.futuro{opacity:.45}
+.dia-cab{font-size:12px;color:var(--cinza-3);text-align:center}
+.dia-cab .dn{text-transform:uppercase;font-weight:700;color:var(--cinza-4)}
+.dia.hoje .dia-cab{color:var(--branco)}
+.bem{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 8px;font-size:11px;color:var(--cinza-4);font-variant-numeric:tabular-nums}
+.treino{background:var(--cinza-1);font-size:12px;line-height:1.35}
+.treino header{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;padding:5px 7px;background:var(--hd,#2a2a2a);color:var(--hdt,#fff)}
+.treino header .esp{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;width:100%}
+.treino header b{font-stretch:75%;font-weight:800;font-size:17px}
+.treino header .dist{font-size:13px;font-weight:600}
+.treino .det{display:flex;flex-wrap:wrap;gap:2px 8px;padding:5px 7px 0;color:var(--cinza-4);font-variant-numeric:tabular-nums}
+.treino .det b{color:var(--branco)}
+.treino .nome{margin:0;padding:3px 7px 7px;color:var(--cinza-3);overflow-wrap:anywhere}
+.t-Run{--hd:#fff;--hdt:#000}
+.t-Ride{--hd:#bdbdbd;--hdt:#000}
+.t-Swim{--hd:#7d7d7d;--hdt:#fff}
+.t-Strength{--hd:#3a3a3a;--hdt:#fff}
+.t-Other{--hd:#2a2a2a;--hdt:#fff}
+@media (max-width:900px){
+  .calendario{width:auto;left:0;transform:none}
+  .semana{grid-template-columns:1fr}
+  .sem-resumo{padding-right:0}
+  .sem-dias{grid-template-columns:1fr}
+  .dia{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:flex-start}
+  .dia-cab{width:100%;text-align:left}
+  .bem{width:100%;justify-content:flex-start}
+  .treino{flex:1 1 220px}
+  .dia.sem-nada{display:none}
+}
