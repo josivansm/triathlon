@@ -342,7 +342,7 @@
     if (concluidas.length) frag.append(secao('Provas', 'Resultados oficiais, com as parciais de cada etapa.', resultados(concluidas, atividades)));
 
     frag.append(secao('Atividades recentes', null, atividadesRecentes(atividades)));
-    const geo = secaoGeografia(atividades, ctx.locais); if (geo) frag.append(geo);
+    const geo = secaoGeografia(atividades, ctx.locais, ctx.lugares); if (geo) frag.append(geo);
     $('#conteudo').replaceChildren(frag);
     agendar(boxMes, () => barrasEmpilhadas(boxMes, meses, { unidade: 'h', fmtX: (k) => MESES[+k.slice(5, 7) - 1], alt: 'Barras empilhadas com as horas de natação, bike e corrida em cada um dos últimos 12 meses' }));
   }
@@ -515,68 +515,143 @@
     }));
   }
 
-  // ---------- geografia: onde os treinos acontecem (locais arredondados a ~11 km) ----------
+  // ---------- geografia: globo 3D (MapLibre), locais arredondados a ~11 km e percursos sem 500 m nas pontas ----------
   const distanciaKm = (a, b) => {
     const r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLng = (b[1] - a[1]) * r;
     const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLng / 2) ** 2;
     return 2 * 6371 * Math.asin(Math.sqrt(h));
   };
+  const chaveLocal = (p) => p[0].toFixed(1) + ',' + p[1].toFixed(1);
   const coord = (p) => fmt(Math.abs(p[0]), 1) + '°' + (p[0] < 0 ? 'S' : 'N') + ', ' + fmt(Math.abs(p[1]), 1) + '°' + (p[1] < 0 ? 'O' : 'L');
-  let leafletPronto = null;
-  const carregarLeaflet = () => leafletPronto || (leafletPronto = new Promise((ok, falha) => {
+  const MAPLIBRE = 'https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.7.2/';
+  let maplibrePronto = null;
+  const carregarMaplibre = () => maplibrePronto || (maplibrePronto = new Promise((ok, falha) => {
     const css = document.createElement('link');
-    css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    css.rel = 'stylesheet'; css.href = MAPLIBRE + 'maplibre-gl.min.css';
     document.head.append(css);
     const js = document.createElement('script');
-    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-    js.onload = () => ok(window.L); js.onerror = falha;
+    js.src = MAPLIBRE + 'maplibre-gl.min.js';
+    js.onload = () => ok(window.maplibregl); js.onerror = falha;
     document.head.append(js);
   }));
+  // mapa livre do OpenStreetMap, em tons de cinza e escurecido, num globo
+  const ESTILO_GLOBO = {
+    version: 8,
+    projection: { type: 'globe' },
+    sky: { 'sky-color': '#000000', 'horizon-color': '#3a3a3a', 'fog-color': '#1c1c1c', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
+    sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' } },
+    layers: [
+      { id: 'fundo', type: 'background', paint: { 'background-color': '#000' } },
+      { id: 'osm', type: 'raster', source: 'osm', paint: { 'raster-saturation': -1, 'raster-brightness-min': 0, 'raster-brightness-max': 0.34, 'raster-contrast': 0.35 } },
+    ],
+  };
 
-  function secaoGeografia(atividades, locais) {
+  function secaoGeografia(atividades, locais, lugares) {
+    lugares = lugares || {};
     const grupos = new Map();
     for (const a of atividades) {
       const p = locais && locais[a.id];
       if (!p) continue;
-      const k = p.join(',');
-      if (!grupos.has(k)) grupos.set(k, { p, n: 0, tipos: {} });
-      const g = grupos.get(k); g.n++; g.tipos[a.tipo] = (g.tipos[a.tipo] || 0) + 1;
+      const k = chaveLocal(p);
+      if (!grupos.has(k)) grupos.set(k, { k, p, lista: [] });
+      grupos.get(k).lista.push(a);
     }
     if (!grupos.size) return null;
-    const lista = [...grupos.values()].sort((a, b) => b.n - a.n);
-    const casa = lista[0].p;
-    const longe = lista.reduce((m, g) => { const d = distanciaKm(casa, g.p); return d > m.d ? { d, g } : m; }, { d: 0, g: null });
-    const totalGps = soma(lista, (g) => g.n);
+    const ordem = [...grupos.values()].sort((a, b) => b.lista.length - a.lista.length);
+    const casa = ordem[0].p;
+    const longe = ordem.reduce((m, g) => { const d = distanciaKm(casa, g.p); return d > m.d ? { d, g } : m; }, { d: 0, g: null });
+    const nome = (g) => { const l = lugares[g.k]; return l && l.cidade ? l.cidade + (l.cc && l.cc !== 'BR' ? ', ' + l.pais : l.estado ? ', ' + l.estado : '') : coord(g.p); };
+    const paises = new Set(ordem.map((g) => lugares[g.k] && lugares[g.k].cc).filter(Boolean));
+    const totalGps = soma(ordem, (g) => g.lista.length);
 
-    const mapa = el('div', { class: 'geo-mapa', role: 'img', 'aria-label': 'Mapa com ' + lista.length + ' locais de treino; o principal tem ' + lista[0].n + ' treinos.' });
-    const caixa = el('div', { class: 'geo' }, mapa,
-      el('div', { class: 'geo-fatos' },
-        el('p', { class: 'geo-rot', text: 'Onde mais treino' }),
-        el('p', { class: 'geo-linha' }, lista.slice(0, 4).map((g) => el('span', {}, el('b', { text: fmt(g.n) }), ' em ' + coord(g.p)))),
-        el('p', { class: 'geo-rot', text: 'Fatos' }),
-        el('p', { class: 'geo-linha' },
-          el('span', {}, el('b', { text: fmt(lista.length) }), lista.length === 1 ? ' local' : ' locais diferentes'),
-          el('span', {}, el('b', { text: fmt(totalGps) }), ' treinos com GPS'),
-          longe.g ? el('span', {}, 'Mais longe de casa: ', el('b', { text: fmt(longe.d) + ' km' })) : null)));
+    const mapa = el('div', { class: 'geo-mapa', role: 'application', 'aria-label': 'Globo com ' + ordem.length + ' locais de treino. Clique num ponto para ver os treinos e o percurso.' });
+    const painel = el('div', { class: 'geo-painel' });
+    const rodape = el('div', { class: 'geo-fatos' });
+    const caixa = el('div', { class: 'geo' }, el('div', { class: 'geo-topo' }, mapa, painel), rodape);
+    let map = null, marcadores = [];
 
-    carregarLeaflet().then((L) => {
+    const lugarBotao = (g) => { const b = el('button', { type: 'button', class: 'geo-lugar' }, el('b', { text: fmt(g.lista.length) }), ' em ' + nome(g)); b.onclick = () => abrirLugar(g); return b; };
+    rodape.append(
+      el('p', { class: 'geo-rot', text: 'Onde mais treino' }),
+      el('p', { class: 'geo-linha' }, ordem.slice(0, 4).map(lugarBotao)),
+      el('p', { class: 'geo-rot', text: 'Fatos' }),
+      el('p', { class: 'geo-linha' },
+        el('span', {}, el('b', { text: fmt(ordem.length) }), ordem.length === 1 ? ' local' : ' locais diferentes'),
+        paises.size ? el('span', {}, el('b', { text: fmt(paises.size) }), paises.size === 1 ? ' país' : ' países') : null,
+        el('span', {}, el('b', { text: fmt(totalGps) }), ' treinos com GPS'),
+        longe.g ? el('span', {}, 'Mais longe de casa: ', el('b', { text: fmt(longe.d) + ' km' }), ' (' + nome(longe.g) + ')') : null));
+
+    const limparRota = () => { if (map && map.getSource('rota')) { map.removeLayer('rota-brilho'); map.removeLayer('rota'); map.removeSource('rota'); } };
+    const inicio = () => {
+      limparRota();
+      painel.replaceChildren(
+        el('p', { class: 'geo-rot', text: 'Geografia' }),
+        el('h3', { text: 'Onde eu treino' }),
+        el('p', { class: 'geo-txt', text: 'Gire o globo e clique num ponto para ver os treinos daquele lugar. Clique num treino para ver o percurso.' }),
+        el('div', { class: 'geo-lista' }, ordem.slice(0, 8).map(lugarBotao)));
+      if (map) map.flyTo({ center: [casa[1], casa[0]], zoom: 1.6, pitch: 0, bearing: 0, duration: 1600 });
+    };
+    function abrirLugar(g) {
+      limparRota();
+      const lista = [...g.lista].sort((a, b) => b.data.localeCompare(a.data));
+      const voltar = el('button', { type: 'button', class: 'filtro', text: '← Voltar' }); voltar.onclick = inicio;
+      painel.replaceChildren(
+        el('p', { class: 'geo-rot', text: coord(g.p) }),
+        el('h3', { text: nome(g) }),
+        el('p', { class: 'geo-txt' }, el('b', { text: fmt(lista.length) }), lista.length === 1 ? ' treino' : ' treinos', ' · ', el('b', { text: fmt(soma(lista, (a) => a.distancia_km)) }), ' km'),
+        el('div', { class: 'geo-lista' }, lista.slice(0, 40).map((a) => {
+          const b = el('button', { type: 'button', class: 'geo-treino' },
+            el('span', { class: 'd', text: dataCurta(a.data) + '/' + a.data.slice(2, 4) }), el('span', { class: 'n', text: a.nome }),
+            el('span', { class: 'v', text: (ROTULO[a.tipo] || 'Outro') + ' · ' + (distTxt(a) || horas(a.tempo_min)) }));
+          b.onclick = () => abrirTreino(a, g); return b;
+        })),
+        el('div', { class: 'geo-acoes' }, voltar));
+      if (map) map.flyTo({ center: [g.p[1], g.p[0]], zoom: 10.5, pitch: 0, duration: 1800 });
+    }
+    async function abrirTreino(a, g) {
+      const voltar = el('button', { type: 'button', class: 'filtro', text: '← ' + nome(g) }); voltar.onclick = () => abrirLugar(g);
+      const dado = (v, r) => el('div', { class: 'geo-dado' }, el('b', { text: v }), el('span', { text: r }));
+      const aviso = el('p', { class: 'geo-txt' });
+      painel.replaceChildren(
+        el('p', { class: 'geo-rot', text: dataLonga(a.data) }),
+        el('h3', { text: a.nome }),
+        el('div', { class: 'geo-dados' },
+          dado(distTxt(a) || '—', 'distância'), dado(horas(a.tempo_min), 'tempo'),
+          a.distancia_km ? dado(ritmo(a), a.tipo === 'Ride' ? 'velocidade média' : 'ritmo médio') : null,
+          dado(fmt(a.elevacao_m) + ' m', 'subida'), a.fc_media ? dado(String(a.fc_media), 'FC média (bpm)') : null, a.carga ? dado(String(a.carga), 'carga (TSS)') : null),
+        aviso,
+        el('div', { class: 'geo-acoes' }, voltar));
+      limparRota();
+      let rota = [];
+      try { rota = await carregar('data/rotas/' + a.id + '.json'); } catch (e) { rota = []; }
+      if (!map) return;
+      if (rota.length < 2) { aviso.textContent = 'Percurso curto demais para mostrar: o site esconde 500 m no começo e no fim de cada treino.'; return; }
+      aviso.textContent = 'O percurso não mostra os primeiros nem os últimos 500 m, por privacidade.';
+      const linha = { type: 'Feature', geometry: { type: 'LineString', coordinates: rota.map((p) => [p[1], p[0]]) } };
+      map.addSource('rota', { type: 'geojson', data: linha });
+      map.addLayer({ id: 'rota-brilho', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#fff', 'line-width': 9, 'line-opacity': 0.18, 'line-blur': 4 } });
+      map.addLayer({ id: 'rota', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#fff', 'line-width': 3 } });
+      const lats = rota.map((p) => p[0]), lngs = rota.map((p) => p[1]);
+      map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50, pitch: 45, duration: 1800, maxZoom: 15 });
+    }
+
+    inicio();
+    carregarMaplibre().then((ml) => {
       if (!mapa.isConnected) return;
-      const m = L.map(mapa, { scrollWheelZoom: false, zoomControl: true, attributionControl: true });
-      // mapa livre do OpenStreetMap, escurecido em preto e branco pelo CSS (.geo-mapa .leaflet-tile-pane)
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 14, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(m);
-      const maior = lista[0].n;
-      for (const g of lista) {
-        const d = Math.round(24 + 34 * Math.sqrt(g.n / maior));
-        const dica = Object.entries(g.tipos).map(([t, n]) => n + ' ' + (ROTULO[t] || t).toLowerCase()).join(', ');
-        L.marker(g.p, { icon: L.divIcon({ className: 'geo-ponto', html: String(g.n), iconSize: [d, d] }), title: g.n + ' treinos: ' + dica, keyboard: false, zIndexOffset: g.n }).addTo(m);
-      }
-      if (lista.length === 1) m.setView(casa, 10);
-      else m.fitBounds(lista.map((g) => g.p), { padding: [40, 40], maxZoom: 11 });
+      map = new ml.Map({ container: mapa, style: ESTILO_GLOBO, center: [casa[1], casa[0]], zoom: 1.6, attributionControl: { compact: true }, maxPitch: 70 });
+      map.addControl(new ml.NavigationControl({ visualizePitch: true }), 'top-right');
+      mapa.mapa = map; // útil para inspecionar pelo console
+      map.scrollZoom.disable(); // a página continua rolando; zoom pelos botões, pinça ou duplo clique
+      const maior = ordem[0].lista.length;
+      marcadores = ordem.map((g) => {
+        const d = Math.round(22 + 30 * Math.sqrt(g.lista.length / maior));
+        const elemento = el('button', { type: 'button', class: 'geo-ponto', 'aria-label': g.lista.length + ' treinos em ' + nome(g), text: String(g.lista.length), style: 'width:' + d + 'px;height:' + d + 'px;z-index:' + g.lista.length });
+        elemento.onclick = (e) => { e.stopPropagation(); abrirLugar(g); };
+        return new ml.Marker({ element: elemento }).setLngLat([g.p[1], g.p[0]]).addTo(map);
+      });
     }).catch(() => { mapa.replaceChildren(el('p', { class: 'vazio', text: 'Não foi possível carregar o mapa agora.' })); });
 
-    return secao('Geografia', 'Onde eu treino. Cada ponto junta os treinos num raio de uns 10 km: o mapa mostra a cidade, nunca a rota.', caixa);
+    return secao('Geografia', 'Onde eu treino. Cada ponto junta os treinos num raio de uns 10 km.', caixa);
   }
 
   // ---------- calendário semanal ----------
@@ -739,16 +814,16 @@
 
   async function iniciar() {
     try {
-      const [site, provas, atividades, bemEstar, meta, planejadosSync, planejadosManual, locais] = await Promise.all([
+      const [site, provas, atividades, bemEstar, meta, planejadosSync, planejadosManual, locais, lugares] = await Promise.all([
         carregar('config/site.json'), carregar('config/provas.json'), carregar('data/atividades.json'),
-        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []), carregar('config/planejados.json').catch(() => []), carregar('data/locais.json').catch(() => ({})),
+        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []), carregar('config/planejados.json').catch(() => []), carregar('data/locais.json').catch(() => ({})), carregar('data/lugares.json').catch(() => ({})),
       ]);
       atividades.sort((a, b) => a.data.localeCompare(b.data));
       bemEstar.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
       // planejados: os do Intervals.icu/TrainingPeaks (sync) + os que você envia à mão em config/planejados.json
       const planejados = [...planejadosSync, ...planejadosManual.map((p) => ({ fonte: 'Garmin', ...p }))].filter((p) => p && p.data);
       planejados.sort((a, b) => a.data.localeCompare(b.data));
-      const ctx = { site, provas, atividades, bemEstar, meta, planejados, locais };
+      const ctx = { site, provas, atividades, bemEstar, meta, planejados, locais, lugares };
 
       const h = hojeISO();
       const ativas = provas.filter((p) => p.data >= h || diasEntre(p.data, h) <= 30).sort((a, b) => a.data.localeCompare(b.data));

@@ -55,39 +55,116 @@ def pedir(caminho, params, base=None):
         raise
 
 
-def local_aproximado(id_atividade):
-    """Centro da área do treino, arredondado a 0,1° (cerca de 11 km): mostra a cidade, nunca a rota nem o endereço."""
+ZONA_PRIVADA_M = 500   # metros cortados do começo e do fim de cada percurso (protege casa e trabalho)
+MAX_PONTOS_ROTA = 400  # pontos por percurso no site (o suficiente para desenhar, leve para carregar)
+
+
+def dist_m(a, b):
+    import math
+    r = math.pi / 180
+    dlat, dlng = (b[0] - a[0]) * r, (b[1] - a[1]) * r
+    h = math.sin(dlat / 2) ** 2 + math.cos(a[0] * r) * math.cos(b[0] * r) * math.sin(dlng / 2) ** 2
+    return 2 * 6371000 * math.asin(math.sqrt(h))
+
+
+def cortar_pontas(pontos, metros):
+    """Tira os primeiros e os últimos `metros` do percurso."""
+    def corta_inicio(seq):
+        andado = 0
+        for i in range(1, len(seq)):
+            andado += dist_m(seq[i - 1], seq[i])
+            if andado >= metros:
+                return seq[i:]
+        return []
+    pontos = corta_inicio(pontos)
+    return corta_inicio(pontos[::-1])[::-1]
+
+
+def simplificar(pontos, maximo=MAX_PONTOS_ROTA):
+    if len(pontos) <= maximo:
+        return pontos
+    passo = len(pontos) / maximo
+    return [pontos[int(i * passo)] for i in range(maximo)] + [pontos[-1]]
+
+
+def mapa_do_treino(id_atividade):
+    """Devolve (local aproximado a 0,1°, percurso sem as pontas) ou (None, None) para treino sem GPS."""
     try:
-        m = pedir(f"/activity/{id_atividade}/map", {"boundsOnly": "true"}, base="https://intervals.icu/api/v1")
+        m = pedir(f"/activity/{id_atividade}/map", {}, base="https://intervals.icu/api/v1")
     except Exception:
-        return None  # treino sem GPS (rolo, piscina, academia) ou mapa indisponível
-    b = (m or {}).get("bounds") if isinstance(m, dict) else None
+        return None, None  # rolo, piscina, academia ou mapa indisponível
+    if not isinstance(m, dict):
+        return None, None
+    pontos = [p for p in (m.get("latlngs") or [])
+              if isinstance(p, (list, tuple)) and len(p) >= 2 and p[0] is not None and p[1] is not None]
+    b = m.get("bounds")
     try:
         lat, lng = (b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2
     except (TypeError, IndexError, KeyError):
+        if not pontos:
+            return None, None
+        lat, lng = sum(p[0] for p in pontos) / len(pontos), sum(p[1] for p in pontos) / len(pontos)
+    rota = [[round(p[0], 5), round(p[1], 5)] for p in simplificar(cortar_pontas(pontos, ZONA_PRIVADA_M))]
+    return [round(lat, 1), round(lng, 1)], rota
+
+
+def nome_do_lugar(lat, lng):
+    """Cidade e país pelo OpenStreetMap (Nominatim). Só é chamado uma vez por local novo."""
+    url = (f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=pt-BR"
+           f"&lat={lat}&lon={lng}")
+    req = urllib.request.Request(url, headers={"User-Agent": "site-treinos-sync/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            j = json.load(r)
+    except Exception:
         return None
-    return [round(lat, 1), round(lng, 1)]
+    a = j.get("address") or {}
+    cidade = a.get("city") or a.get("town") or a.get("village") or a.get("municipality") or a.get("county") or a.get("state")
+    return {"cidade": cidade, "estado": a.get("state"), "pais": a.get("country"), "cc": (a.get("country_code") or "").upper()}
 
 
 def atualizar_locais(atividades, virtuais, limite=500):
-    """Guarda em data/locais.json o local aproximado de cada treino ao ar livre. Só busca os que ainda não estão lá."""
+    """Atualiza data/locais.json (local de cada treino), data/rotas/<id>.json (percurso) e data/lugares.json (nomes)."""
+    import time
     arquivo = DADOS / "locais.json"
+    pasta = DADOS / "rotas"
+    pasta.mkdir(exist_ok=True)
     locais = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
     novos = 0
     for a in atividades:
-        if a["id"] in locais or not a.get("distancia_km") or a["tipo"] not in ("Run", "Ride", "Swim"):
+        if not a.get("distancia_km") or a["tipo"] not in ("Run", "Ride", "Swim"):
             continue
         if a["id"] in virtuais:
             locais[a["id"]] = None
             continue
+        ja_tem_rota = (pasta / f"{a['id']}.json").exists()
+        if a["id"] in locais and (locais[a["id"]] is None or ja_tem_rota):
+            continue
         if novos >= limite:
             break
-        locais[a["id"]] = local_aproximado(a["id"])
+        local, rota = mapa_do_treino(a["id"])
+        locais[a["id"]] = local
+        if local is not None:
+            (pasta / f"{a['id']}.json").write_text(json.dumps(rota or [], separators=(",", ":")), encoding="utf-8")
         novos += 1
     ids = {a["id"] for a in atividades}
     locais = {k: v for k, v in locais.items() if k in ids}
     arquivo.write_text(json.dumps(locais, separators=(",", ":")), encoding="utf-8")
-    print(f"{novos} treinos consultados para o mapa; {sum(1 for v in locais.values() if v)} com local.")
+
+    # nomes dos lugares (uma consulta por local novo, respeitando o limite de 1 por segundo do Nominatim)
+    arq_lugares = DADOS / "lugares.json"
+    lugares = json.loads(arq_lugares.read_text(encoding="utf-8")) if arq_lugares.exists() else {}
+    chaves = sorted({f"{p[0]:.1f},{p[1]:.1f}" for p in locais.values() if p})
+    for k in chaves:
+        if k in lugares:
+            continue
+        lat, lng = k.split(",")
+        nome = nome_do_lugar(lat, lng)
+        if nome:
+            lugares[k] = nome
+        time.sleep(1.2)
+    arq_lugares.write_text(json.dumps(lugares, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"{novos} treinos consultados para o mapa; {sum(1 for v in locais.values() if v)} com local; {len(lugares)} lugares com nome.")
 
 
 def periodos(inicio, fim, dias=180):

@@ -258,3 +258,33 @@ img{max-width:100%}
 .leaflet-control-attribution a{color:var(--cinza-4)!important}
 .geo-mapa .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.85) contrast(.9)}
 .geo-mapa.leaflet-container{background:#0b0b0b}
+
+/* geografia 3D: globo + painel */
+.geo-topo{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr)}
+.geo-topo .geo-mapa{height:clamp(380px,48vw,560px);border-right:1px solid var(--cinza-2)}
+.geo-painel{padding:20px 22px;display:flex;flex-direction:column;gap:10px;max-height:clamp(380px,48vw,560px);overflow:auto}
+.geo-painel h3{margin:0;font-stretch:75%;font-weight:800;font-size:clamp(22px,2.6vw,30px);line-height:1.1}
+.geo-painel .geo-rot{margin:0}
+.geo-txt{margin:0;color:var(--cinza-4);font-size:14px}
+.geo-txt b{color:var(--branco)}
+.geo-lista{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.geo-lugar,.geo-treino{font:inherit;text-align:left;color:var(--cinza-4);background:none;border:0;border-bottom:1px solid var(--cinza-1);padding:8px 2px;cursor:pointer;font-size:14px}
+.geo-lugar:hover,.geo-treino:hover{color:var(--branco);background:var(--cinza-1)}
+.geo-lugar b{color:var(--branco)}
+.geo-linha .geo-lugar{border:0;padding:0;font-size:14px}
+.geo-treino{display:grid;grid-template-columns:auto 1fr;gap:0 10px}
+.geo-treino .d{color:var(--cinza-3);font-variant-numeric:tabular-nums;grid-row:span 2}
+.geo-treino .n{color:var(--branco)}
+.geo-treino .v{font-size:12px;color:var(--cinza-3)}
+.geo-dados{display:grid;grid-template-columns:1fr 1fr;gap:16px 18px;margin:8px 0}
+.geo-dado b{display:block;font-stretch:75%;font-weight:800;font-size:clamp(24px,3vw,32px);line-height:1;font-variant-numeric:tabular-nums}
+.geo-dado span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza-3)}
+.geo-acoes{margin-top:auto;padding-top:10px}
+button.geo-ponto{border:0;padding:0;cursor:pointer;font:inherit;font-weight:800;font-size:12px}
+.maplibregl-ctrl-attrib{background:rgba(0,0,0,.6)!important;color:var(--cinza-3)!important}
+.maplibregl-ctrl-attrib a{color:var(--cinza-4)!important}
+@media (max-width:820px){
+  .geo-topo{grid-template-columns:1fr}
+  .geo-topo .geo-mapa{height:380px;border-right:0;border-bottom:1px solid var(--cinza-2)}
+  .geo-painel{max-height:none}
+}
