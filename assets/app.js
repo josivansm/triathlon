@@ -440,7 +440,7 @@
     const u = serie[serie.length - 1];
     const forma = u.forma;
     const leitura = forma == null ? '' : forma <= -20 ? 'Fadiga alta: vale priorizar o descanso.' : forma < -5 ? 'Carga produtiva: você está construindo fitness.' : forma <= 10 ? 'Equilibrado.' : 'Descansado: bom momento para prova ou teste.';
-    frag.append(el('p', { class: 'sub' }, 'Noite de ' + dataCurta(u.data) + ': ', el('b', { text: u.sono_h != null ? horas(u.sono_h * 60) : '—' }), ' de sono e HRV de ',
+    frag.append(el('p', { class: 'sub' }, 'Noite de ' + dataCurta(u.data) + ': ', ...(u.sono_h != null ? [el('b', { text: horas(u.sono_h * 60) }), ' de sono e HRV de '] : ['sono ainda não registrado; HRV de ']),
       el('b', { text: fmt(u.hrv) }), ' ms, contra média de 7 dias de ', el('b', { text: fmt(u.hrv7) }), ' ms. ', leitura));
     frag.append(el('dl', { class: 'faixa' },
       numero('Sono', u.sono_h != null ? horas(u.sono_h * 60) : '—'), numero('HRV', fmt(u.hrv), 'ms'),
@@ -610,7 +610,19 @@
     else if (atual === 'recuperacao') { document.title = 'Recuperação · ' + ctx.site.nome; paginaRecuperacao(ctx); }
     else { document.title = ctx.site.nome; paginaInicio(ctx); }
     window.scrollTo(0, 0);
+    ajustarTitulos();
   }
+
+  // Diminui o título até a palavra mais longa caber na largura, sem quebrar no meio da palavra.
+  function ajustarTitulos() {
+    document.querySelectorAll('.titulo').forEach((t) => {
+      t.style.fontSize = '';
+      let fs = parseFloat(getComputedStyle(t).fontSize);
+      while (t.scrollWidth > t.clientWidth + 1 && fs > 28) { fs -= 2; t.style.fontSize = fs + 'px'; }
+    });
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(ajustarTitulos);
+  let esperaTitulo; window.addEventListener('resize', () => { clearTimeout(esperaTitulo); esperaTitulo = setTimeout(ajustarTitulos, 120); });
 
   async function iniciar() {
     try {
