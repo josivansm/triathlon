@@ -583,6 +583,7 @@
       };
       const semanas = [];
       for (let s = segunda(ini); s <= fim; s = somaDias(s, 7)) semanas.push(s);
+      semanas.reverse(); // semana mais recente primeiro
       area.replaceChildren(
         el('div', { class: 'mes-nav' },
           btn('‹', mudaMes(mes, -1), 'Mês anterior'),
