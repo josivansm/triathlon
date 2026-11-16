@@ -584,6 +584,9 @@
       const semanas = [];
       for (let s = segunda(ini); s <= fim; s = somaDias(s, 7)) semanas.push(s);
       semanas.reverse(); // semana mais recente primeiro
+      // semanas futuras só aparecem se tiverem treino planejado
+      const comPlano = (seg) => [...Array(7)].some((_, i) => planDia.has(somaDias(seg, i)));
+      for (let i = semanas.length - 1; i >= 0; i--) if (semanas[i] > segunda(h) && !comPlano(semanas[i])) semanas.splice(i, 1);
       area.replaceChildren(
         el('div', { class: 'mes-nav' },
           btn('‹', mudaMes(mes, -1), 'Mês anterior'),
