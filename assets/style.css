@@ -183,3 +183,39 @@ td.n,th.n{text-align:right}
   .treino{flex:1 1 220px}
   .dia.sem-nada{display:none}
 }
+
+/* foto e topo da página inicial */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,38%);gap:clamp(20px,4vw,48px);align-items:end}
+.hero-foto{margin:0;aspect-ratio:2/3;overflow:hidden;background:var(--cinza-1);border:1px solid var(--cinza-2)}
+.hero-foto img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 30%;filter:grayscale(1) contrast(1.08)}
+.equipe{margin:16px 0 0;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--cinza-4)}
+@media (max-width:720px){
+  .hero{grid-template-columns:1fr}
+  .hero-foto{order:-1;aspect-ratio:4/5;margin-bottom:4px}
+}
+
+/* calendário mensal */
+.mes-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.mes-nav h2{margin:0 4px;font-stretch:75%;font-weight:800;font-size:clamp(26px,4vw,38px);min-width:9ch;text-align:center}
+.mes-nav .filtro{min-width:44px;min-height:40px;font-size:18px}
+.mes-nav .filtro:disabled{opacity:.3;cursor:default}
+.mes-total{flex-basis:100%;margin:2px 0 0;color:var(--cinza-3);font-size:14px}
+.mes-total b{color:var(--branco)}
+.dia.fora{opacity:.35}
+.treino.planejado{background:transparent;border:1px dashed var(--cinza-3)}
+.treino.planejado header{background:transparent;color:var(--branco)}
+.treino.planejado header .esp{color:var(--cinza-4)}
+
+/* ajustes gerais para celular */
+img{max-width:100%}
+@media (max-width:520px){
+  .faixa{grid-template-columns:1fr 1fr}
+  .numero{padding-right:10px}
+  .relogio{gap:8px}
+  .contagem{padding:16px}
+  .divisao-lista{grid-template-columns:1fr}
+  td,th{padding-right:10px}
+  .resultado summary{grid-template-columns:auto 1fr;}
+  .resultado .tempo{grid-column:2}
+}
+.hero .titulo{font-size:clamp(56px,10.5vw,150px);overflow-wrap:normal;hyphens:none}

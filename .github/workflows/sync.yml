@@ -19,6 +19,7 @@ jobs:
       - name: Buscar dados no Intervals.icu
         env:
           INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
+          TRAININGPEAKS_ICAL: ${{ secrets.TRAININGPEAKS_ICAL }}
         run: python scripts/sync.py
       - name: Salvar no repositório
         run: |

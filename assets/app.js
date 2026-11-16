@@ -282,8 +282,12 @@
     const km = (tipo) => soma(doAno.filter((a) => a.tipo === tipo), (a) => a.distancia_km);
     const frag = document.createDocumentFragment();
 
-    frag.append(el('h1', { class: 'titulo', text: site.nome }));
-    frag.append(el('p', { class: 'sub' }, site.subtitulo + ' Em ' + ano + ': ', el('b', { text: horas(soma(doAno, (a) => a.tempo_min)) }), ' de treino em ', el('b', { text: fmt(doAno.length) }), ' sessões.'));
+    const textoHero = el('div', { class: 'hero-texto' },
+      el('h1', { class: 'titulo', text: site.nome }),
+      site.equipe ? el('p', { class: 'equipe', text: site.equipe }) : null,
+      el('p', { class: 'sub' }, site.subtitulo + ' Em ' + ano + ': ', el('b', { text: horas(soma(doAno, (a) => a.tempo_min)) }), ' de treino em ', el('b', { text: fmt(doAno.length) }), ' sessões.'));
+    frag.append(site.foto ? el('div', { class: 'hero' }, textoHero,
+      el('figure', { class: 'hero-foto' }, el('img', { src: site.foto, alt: site.foto_alt || ('Foto de ' + site.nome), loading: 'eager', decoding: 'async' }))) : textoHero);
 
     // números de toda a história, com comparações
     const kmTotal = soma(atividades, (a) => a.distancia_km), minTotal = soma(atividades, (a) => a.tempo_min), subida = soma(atividades, (a) => a.elevacao_m);
@@ -501,22 +505,37 @@
       el('p', { class: 'nome', text: a.nome }));
   }
 
+  function cartaoPlanejado(p, feito) {
+    const tipo = ROTULO[p.tipo] ? p.tipo : 'Other';
+    return el('article', { class: 'treino planejado t-' + tipo + (feito ? ' feito' : ''), title: p.descricao || null },
+      el('header', {}, el('span', { class: 'esp', text: (feito ? '✓ ' : '') + 'Planejado · ' + ROTULO[tipo] }),
+        p.tempo_min ? el('b', { text: horas(p.tempo_min) }) : null, p.distancia_km ? el('span', { class: 'dist', text: distTxt(p) }) : null),
+      el('p', { class: 'nome', text: p.nome }));
+  }
+
+  const NOMES_MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  let mesCalendario = null;
+
   function paginaCalendario(ctx) {
-    const { atividades, bemEstar } = ctx, h = hojeISO();
-    const porDia = d3.group(atividades, (a) => a.data);
+    const { atividades, bemEstar } = ctx, planejados = ctx.planejados || [], h = hojeISO();
+    const porDia = d3.group(atividades, (a) => a.data), planDia = d3.group(planejados, (p) => p.data);
     const be = new Map(bemEstar.map((w) => [w.data, w]));
-    const primeira = atividades.length ? segunda(atividades[0].data) : segunda(h);
+    const mesMin = (atividades.length ? atividades[0].data : h).slice(0, 7);
+    const ultimoPlan = planejados.length ? planejados[planejados.length - 1].data.slice(0, 7) : h.slice(0, 7);
+    const mesMax = ultimoPlan > h.slice(0, 7) ? ultimoPlan : h.slice(0, 7);
+    if (!mesCalendario || mesCalendario < mesMin || mesCalendario > mesMax) mesCalendario = h.slice(0, 7);
+    const mudaMes = (k, n) => { const d = new Date(Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+
     const frag = document.createDocumentFragment();
     frag.append(el('h1', { class: 'titulo', text: 'Calendário' }));
-    frag.append(el('p', { class: 'sub', text: 'Semana a semana, do mais recente para o mais antigo. Cada dia mostra a noite anterior (sono, HRV e FC de repouso) e os treinos.' }));
-    const lista = el('div', { class: 'calendario' });
-    const mais = el('button', { type: 'button', class: 'filtro mais', text: 'Mostrar semanas anteriores' });
-    let proxima = segunda(h);
-    const POR_VEZ = 6;
+    frag.append(el('p', { class: 'sub', text: 'O mês inteiro: treinos feitos, treinos planejados e a noite anterior de cada dia (sono, HRV e FC de repouso).' }));
+    const area = el('div', { class: 'calendario' });
+    frag.append(area);
 
-    const semana = (seg) => {
+    const semana = (seg, mes) => {
       const dias = [...Array(7)].map((_, i) => somaDias(seg, i));
       const doSem = dias.flatMap((d) => porDia.get(d) || []);
+      const planSem = dias.filter((d) => d >= h).flatMap((d) => planDia.get(d) || []);
       const ultimoBE = dias.map((d) => be.get(d)).filter((w) => w && w.ctl != null).pop();
       const porEsporte = ['Ride', 'Run', 'Swim', 'Strength', 'Other'].map((t) => {
         const l = doSem.filter((a) => (ROTULO[a.tipo] ? a.tipo : 'Other') === t);
@@ -525,35 +544,57 @@
       const resumo = el('aside', { class: 'sem-resumo' },
         el('h3', {}, 'Sem. ' + semanaISO(seg), el('small', { text: dataCurta(seg) + ' a ' + dataCurta(dias[6]) })),
         el('dl', {},
-          el('div', {}, el('dt', { text: 'Total' }), el('dd', { text: horas(soma(doSem, (a) => a.tempo_min)) })),
+          el('div', {}, el('dt', { text: 'Feito' }), el('dd', { text: horas(soma(doSem, (a) => a.tempo_min)) })),
           el('div', {}, el('dt', { text: 'Carga' }), el('dd', { text: fmt(soma(doSem, (a) => a.carga)) })),
+          planSem.length ? el('div', {}, el('dt', { text: 'Planejado' }), el('dd', { text: horas(soma(planSem, (p) => p.tempo_min)) })) : null,
           el('div', {}, el('dt', { text: 'Distância' }), el('dd', { text: fmt(soma(doSem, (a) => a.distancia_km), 1) + ' km' })),
           ultimoBE ? el('div', {}, el('dt', { text: 'Forma' }), el('dd', { text: fmt(ultimoBE.ctl - ultimoBE.atl) })) : null,
-          ultimoBE ? el('div', {}, el('dt', { text: 'Fitness' }), el('dd', { text: fmt(ultimoBE.ctl) })) : null,
-          ultimoBE ? el('div', {}, el('dt', { text: 'Fadiga' }), el('dd', { text: fmt(ultimoBE.atl) })) : null),
+          ultimoBE ? el('div', {}, el('dt', { text: 'Fitness' }), el('dd', { text: fmt(ultimoBE.ctl) })) : null),
         porEsporte.length ? el('table', { class: 'sem-esportes' },
           el('tbody', {}, porEsporte.map((x) => el('tr', {}, el('td', { text: ROTULO[x.t] }), el('td', { class: 'n', text: horas(x.min) }),
             el('td', { class: 'n', text: x.km ? fmt(x.km, x.t === 'Swim' ? 1 : 0) + ' km' : '—' }), el('td', { class: 'n', text: x.carga ? String(Math.round(x.carga)) : '—' }))))) : null);
       const grade = el('div', { class: 'sem-dias' }, dias.map((d, i) => {
-        const w = be.get(d), treinos = porDia.get(d) || [];
+        const w = be.get(d), treinos = porDia.get(d) || [], plan = planDia.get(d) || [];
+        // planejado de um dia passado só aparece se não houve treino do mesmo esporte (fica marcado como feito)
+        const planCartoes = plan.map((p) => {
+          const feito = treinos.some((a) => a.tipo === p.tipo);
+          return d < h && feito ? null : cartaoPlanejado(p, false);
+        }).filter(Boolean);
         const bem = w && (w.sono_h || w.hrv || w.fc_repouso) ? el('div', { class: 'bem' },
           w.sono_h ? el('span', { title: 'Sono' }, '☾ ', horas(w.sono_h * 60)) : null,
           w.hrv ? el('span', { title: 'HRV' }, '♥ ', fmt(w.hrv), ' ms') : null,
           w.fc_repouso ? el('span', { title: 'FC de repouso' }, fmt(w.fc_repouso), ' bpm') : null) : null;
-        return el('div', { class: 'dia' + (d === h ? ' hoje' : '') + (d > h ? ' futuro' : '') + (!treinos.length && !bem ? ' sem-nada' : '') },
+        const vazio = !treinos.length && !planCartoes.length && !bem;
+        return el('div', { class: 'dia' + (d === h ? ' hoje' : '') + (d > h ? ' futuro' : '') + (d.slice(0, 7) !== mes ? ' fora' : '') + (vazio ? ' sem-nada' : '') },
           el('div', { class: 'dia-cab' }, el('span', { class: 'dn', text: DIAS_SEMANA[i] }), ' ', dataCurta(d)),
-          bem, treinos.map(cartaoTreino));
+          bem, treinos.map(cartaoTreino), planCartoes);
       }));
       return el('section', { class: 'semana' }, resumo, grade);
     };
 
-    const carregarMais = () => {
-      for (let i = 0; i < POR_VEZ && proxima >= primeira; i++) { lista.append(semana(proxima)); proxima = somaDias(proxima, -7); }
-      mais.hidden = proxima < primeira;
+    const desenhar = () => {
+      const mes = mesCalendario, ini = mes + '-01', fim = somaDias(mudaMes(mes, 1) + '-01', -1);
+      const doMes = atividades.filter((a) => a.data >= ini && a.data <= fim);
+      const planMes = planejados.filter((p) => p.data >= ini && p.data <= fim);
+      const btn = (txt, alvo, rotulo) => {
+        const b = el('button', { type: 'button', class: 'filtro', text: txt, 'aria-label': rotulo });
+        if (!alvo || alvo < mesMin || alvo > mesMax) b.disabled = true; else b.onclick = () => { mesCalendario = alvo; desenhar(); };
+        return b;
+      };
+      const semanas = [];
+      for (let s = segunda(ini); s <= fim; s = somaDias(s, 7)) semanas.push(s);
+      area.replaceChildren(
+        el('div', { class: 'mes-nav' },
+          btn('‹', mudaMes(mes, -1), 'Mês anterior'),
+          el('h2', { text: NOMES_MES[+mes.slice(5, 7) - 1] + ' ' + mes.slice(0, 4) }),
+          btn('›', mudaMes(mes, 1), 'Próximo mês'),
+          mes !== h.slice(0, 7) ? btn('Hoje', h.slice(0, 7), 'Voltar para o mês atual') : null,
+          el('p', { class: 'mes-total' }, el('b', { text: fmt(doMes.length) }), ' treinos · ', el('b', { text: horas(soma(doMes, (a) => a.tempo_min)) }),
+            ' · ', el('b', { text: fmt(soma(doMes, (a) => a.distancia_km)) }), ' km',
+            planMes.length ? [' · ', el('b', { text: fmt(planMes.length) }), ' planejados'] : null)),
+        ...semanas.map((s) => semana(s, mes)));
     };
-    mais.onclick = carregarMais;
-    carregarMais();
-    frag.append(lista, mais);
+    desenhar();
     $('#conteudo').replaceChildren(frag);
   }
 
@@ -573,13 +614,14 @@
 
   async function iniciar() {
     try {
-      const [site, provas, atividades, bemEstar, meta] = await Promise.all([
+      const [site, provas, atividades, bemEstar, meta, planejados] = await Promise.all([
         carregar('config/site.json'), carregar('config/provas.json'), carregar('data/atividades.json'),
-        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})),
+        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []),
       ]);
       atividades.sort((a, b) => a.data.localeCompare(b.data));
       bemEstar.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
-      const ctx = { site, provas, atividades, bemEstar, meta };
+      planejados.sort((a, b) => a.data.localeCompare(b.data));
+      const ctx = { site, provas, atividades, bemEstar, meta, planejados };
 
       const h = hojeISO();
       const ativas = provas.filter((p) => p.data >= h || diasEntre(p.data, h) <= 30).sort((a, b) => a.data.localeCompare(b.data));

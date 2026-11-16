@@ -1,17 +1,20 @@
 {
   "nome": "Josivan Marques",
+  "equipe": "Triatleta amador · Equipe Unity",
   "subtitulo": "Natação, bike, corrida e musculação em Manaus, direto do meu Garmin Forerunner 965.",
+  "foto": "assets/foto.jpg",
+  "foto_alt": "Josivan correndo descalço com touca e óculos de natação, saindo da água para a transição de um triathlon.",
   "atleta_id": "i802358",
   "historico_desde": "2026-01-01",
   "apresentacao": {
     "titulo": "Apresentação",
     "paragrafos": [
-      "RASCUNHO, troque pelo seu texto. Comecei a treinar triathlon em setembro de 2026, em Manaus, com um objetivo claro: cruzar a linha de chegada do IRONMAN 70.3 Rio de Janeiro em agosto de 2027.",
-      "Antes do ciclo específico, estou no período base: menos volume, mais alinhamento e técnica. Nadar melhor, pedalar com eficiência e correr leve, para chegar em abril pronto para treinar forte.",
+      "Sou triatleta amador e comecei a treinar em janeiro de 2026, em Manaus. Desde o primeiro dia, a ideia é uma só: evoluir ao máximo, treino após treino.",
+      "Faço parte da equipe Unity. Meu próximo grande desafio é o IRONMAN 70.3 Rio de Janeiro, em agosto de 2027. Até a preparação específica, que começa em abril, estou no período base, focado em alinhamento e técnica.",
       "Este site mostra tudo como está, direto do relógio. Sem filtro."
     ],
     "citacao": null,
-    "assinatura": "Manaus · 2026"
+    "assinatura": "Manaus · Equipe Unity · 2026"
   },
   "provas_concluidas": []
 }
