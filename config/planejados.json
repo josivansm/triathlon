@@ -1,1 +1,24 @@
-[]
+[
+  { "data": "2026-11-16", "tipo": "Run", "nome": "Run Pace 50min Fartlek 2x10/4", "tempo_min": 50, "distancia_km": 9.15, "carga": 64,
+    "descricao": "10' aquec 60-75% | 4x(25\" limiar 95-105% + 50\" rec) | 2x(10' limiar 96-98% + 4' BAS) | ..." },
+  { "data": "2026-11-16", "tipo": "Strength", "nome": "Treino A - FullBody Força Máxima",
+    "descricao": "Força máxima. 22 conjuntos, 7 exercícios: warm up, standing Pallof press, ankle iso push, back squat..." },
+  { "data": "2026-11-17", "tipo": "Ride", "nome": "Bike PW 1h30 Tempo Low 2x30", "tempo_min": 90, "carga": 79,
+    "descricao": "15' aquec 50-70% | 30' SS 75-80% | 5' rec | 30' SS 75-80% | 10' solto" },
+  { "data": "2026-11-18", "tipo": "Run", "nome": "Run Pace 1h04 FM3", "tempo_min": 64, "distancia_km": 11.6, "carga": 80,
+    "descricao": "4' aquec 66-73% | 60' FM3. Bloco contínuo em FM3." },
+  { "data": "2026-11-18", "tipo": "Strength", "nome": "Treino B - FullBody Força Máxima",
+    "descricao": "Força máxima. 23 conjuntos, 7 exercícios: warm up, half kneeling anti-rotation, ankle iso push, trap bar deadlift..." },
+  { "data": "2026-11-19", "tipo": "Ride", "nome": "Bike PW 1h35 FM2", "tempo_min": 95, "carga": 53,
+    "descricao": "4' FM1 | 4' FM1 | 4' FM1 | 75' FM2 | 8' solto. Rodagem contínua em FM2." },
+  { "data": "2026-11-20", "tipo": "Run", "nome": "Run Pace 38min BAS1 + Tempo", "tempo_min": 38, "distancia_km": 6.68, "carga": 44,
+    "descricao": "10' aquec 67-73% | 4x(2' SS 89-94% + 3' rec) | 8' FM1" },
+  { "data": "2026-11-21", "tipo": "Ride", "nome": "Bike PW 2h25 Rolling Hills", "tempo_min": 145, "carga": 144,
+    "descricao": "145' SS 72-82%" },
+  { "data": "2026-11-21", "tipo": "Run", "nome": "Run Pace T2 Limiar 33min", "tempo_min": 33, "distancia_km": 6.25, "carga": 45,
+    "descricao": "8' limiar 92-100% | 25' solto" },
+  { "data": "2026-11-22", "tipo": "Run", "nome": "Prova: Corrida da empresa",
+    "descricao": "Evento marcado no calendário do TrainingPeaks." },
+  { "data": "2026-11-22", "tipo": "Ride", "nome": "Bike PW 1h10 FM2", "tempo_min": 70, "carga": 37,
+    "descricao": "4' FM1 | 4' FM1 | 4' FM1 | 50' FM2 | 8' solto. Foco em cadência." }
+]

@@ -220,3 +220,4 @@ img{max-width:100%}
   .resultado .tempo{grid-column:2}
 }
 .hero .titulo{font-size:clamp(56px,10.5vw,150px);overflow-wrap:normal;hyphens:none}
+.treino .estrutura{margin:0;padding:0 7px 7px;font-size:11px;line-height:1.35;color:var(--cinza-3);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}

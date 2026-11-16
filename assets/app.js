@@ -510,7 +510,9 @@
     return el('article', { class: 'treino planejado t-' + tipo + (feito ? ' feito' : ''), title: p.descricao || null },
       el('header', {}, el('span', { class: 'esp', text: (feito ? '✓ ' : '') + 'Planejado · ' + ROTULO[tipo] }),
         p.tempo_min ? el('b', { text: horas(p.tempo_min) }) : null, p.distancia_km ? el('span', { class: 'dist', text: distTxt(p) }) : null),
-      el('p', { class: 'nome', text: p.nome }));
+      p.carga ? el('div', { class: 'det' }, el('span', { text: 'TSS ' + p.carga })) : null,
+      el('p', { class: 'nome', text: p.nome }),
+      p.descricao ? el('p', { class: 'estrutura', text: p.descricao }) : null);
   }
 
   const NOMES_MES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
