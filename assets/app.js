@@ -560,7 +560,7 @@
     const ordem = [...grupos.values()].sort((a, b) => b.lista.length - a.lista.length);
     const casa = ordem[0].p;
     const longe = ordem.reduce((m, g) => { const d = distanciaKm(casa, g.p); return d > m.d ? { d, g } : m; }, { d: 0, g: null });
-    const nome = (g) => { const l = lugares[g.k]; return l && l.cidade ? l.cidade + (l.cc && l.cc !== 'BR' ? ', ' + l.pais : l.estado ? ', ' + l.estado : '') : coord(g.p); };
+    const nome = (g) => { if (g.nomeFixo) return g.nomeFixo; const l = lugares[g.k]; return l && l.cidade ? l.cidade + (l.cc && l.cc !== 'BR' ? ', ' + l.pais : l.estado ? ', ' + l.estado : '') : coord(g.p); };
     const paises = new Set(ordem.map((g) => lugares[g.k] && lugares[g.k].cc).filter(Boolean));
     const totalGps = soma(ordem, (g) => g.lista.length);
 
@@ -570,13 +570,16 @@
     const caixa = el('div', { class: 'geo' }, el('div', { class: 'geo-topo' }, mapa, painel), rodape);
     let map = null, marcadores = [];
 
+    // a lista e os fatos agrupam por cidade (Manaus pode ocupar vários pontos de ~11 km no globo)
+    const cidades = [...d3.group(ordem, nome)].map(([n, gs]) => ({ k: n, nomeFixo: n, p: gs[0].p, lista: gs.flatMap((g) => g.lista) }))
+      .sort((a, b) => b.lista.length - a.lista.length);
     const lugarBotao = (g) => { const b = el('button', { type: 'button', class: 'geo-lugar' }, el('b', { text: fmt(g.lista.length) }), ' em ' + nome(g)); b.onclick = () => abrirLugar(g); return b; };
     rodape.append(
       el('p', { class: 'geo-rot', text: 'Onde mais treino' }),
-      el('p', { class: 'geo-linha' }, ordem.slice(0, 4).map(lugarBotao)),
+      el('p', { class: 'geo-linha' }, cidades.slice(0, 4).map(lugarBotao)),
       el('p', { class: 'geo-rot', text: 'Fatos' }),
       el('p', { class: 'geo-linha' },
-        el('span', {}, el('b', { text: fmt(ordem.length) }), ordem.length === 1 ? ' local' : ' locais diferentes'),
+        el('span', {}, el('b', { text: fmt(cidades.length) }), cidades.length === 1 ? ' cidade' : ' cidades'),
         paises.size ? el('span', {}, el('b', { text: fmt(paises.size) }), paises.size === 1 ? ' país' : ' países') : null,
         el('span', {}, el('b', { text: fmt(totalGps) }), ' treinos com GPS'),
         longe.g ? el('span', {}, 'Mais longe de casa: ', el('b', { text: fmt(longe.d) + ' km' }), ' (' + nome(longe.g) + ')') : null));
@@ -588,7 +591,7 @@
         el('p', { class: 'geo-rot', text: 'Geografia' }),
         el('h3', { text: 'Onde eu treino' }),
         el('p', { class: 'geo-txt', text: 'Gire o globo e clique num ponto para ver os treinos daquele lugar. Clique num treino para ver o percurso.' }),
-        el('div', { class: 'geo-lista' }, ordem.slice(0, 8).map(lugarBotao)));
+        el('div', { class: 'geo-lista' }, cidades.slice(0, 8).map(lugarBotao)));
       if (map) map.flyTo({ center: [casa[1], casa[0]], zoom: 1.6, pitch: 0, bearing: 0, duration: 1600 });
     };
     function abrirLugar(g) {
@@ -641,7 +644,7 @@
       map = new ml.Map({ container: mapa, style: ESTILO_GLOBO, center: [casa[1], casa[0]], zoom: 1.6, attributionControl: { compact: true }, maxPitch: 70 });
       map.addControl(new ml.NavigationControl({ visualizePitch: true }), 'top-right');
       mapa.mapa = map; // útil para inspecionar pelo console
-      map.scrollZoom.disable(); // a página continua rolando; zoom pelos botões, pinça ou duplo clique
+      // zoom pela rodinha do mouse (com o cursor sobre o mapa), pelos botões, pinça ou duplo clique
       const maior = ordem[0].lista.length;
       marcadores = ordem.map((g) => {
         const d = Math.round(22 + 30 * Math.sqrt(g.lista.length / maior));
