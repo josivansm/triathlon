@@ -167,7 +167,6 @@ def main():
                 "fc_repouso": w.get("restingHR"),
                 "ctl": numero(w.get("ctl")),
                 "atl": numero(w.get("atl")),
-                "peso": numero(w.get("weight")),
             })
     bem_estar.sort(key=lambda r: r["data"] or "")
 

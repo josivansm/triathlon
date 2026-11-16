@@ -12,7 +12,7 @@
     "meta_transicoes": "",
     "inicio_ciclo": "2027-04-08",
     "base": {
-      "inicio": "2026-09-22",
+      "inicio": "2026-01-05",
       "foco": "alinhamento e técnica"
     },
     "distancias": {
@@ -26,6 +26,8 @@
         "maior_km": 3
       },
       "Ride": {
+        "semanal_h": 5.5,
+        "maior_h": 3,
         "semanal_km": 180,
         "maior_km": 100
       },

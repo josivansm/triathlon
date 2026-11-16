@@ -88,7 +88,7 @@ Compre um domínio (ex.: `seunome.com`), vá em **Settings → Pages → Custom 
 
 ## Privacidade
 
-Repositório público significa que os arquivos em `data/` (treinos, sono, HRV, peso) ficam visíveis para quem procurar. O site não guarda mapas nem localização GPS. Se não quiser expor peso, apague a linha `"peso"` em `scripts/sync.py`.
+Repositório público significa que os arquivos em `data/` (treinos, sono, HRV, FC de repouso) ficam visíveis para quem procurar. O peso não é sincronizado. O site não guarda mapas nem localização GPS.
 
 ## Testar no computador (opcional)
 

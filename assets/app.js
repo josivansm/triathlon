@@ -247,7 +247,7 @@
       };
       desenharTabela();
       corpo.replaceChildren(...[
-        el('dl', { class: 'faixa' }, numero('Atividades', fmt(lista.length)), numero('Tempo total', horas(tempo)), numero('Distância', fmt(soma(lista, (a) => a.distancia_km)), 'km')),
+        el('dl', { class: 'faixa' }, numero('Atividades', fmt(lista.length)), numero('Tempo total', horas(tempo)), numero('Distância', fmt(soma(lista.filter((a) => a.tipo !== 'Ride' || kmConfiavel(lista.filter((b) => b.tipo === 'Ride'), 'Ride')), (a) => a.distancia_km)), 'km', kmConfiavel(lista.filter((b) => b.tipo === 'Ride'), 'Ride') || !lista.some((b) => b.tipo === 'Ride') ? null : 'sem a bike, que está sem distância')),
         tempo ? el('div', { class: 'divisao' },
           el('div', { class: 'divisao-barra', role: 'img', 'aria-label': 'Divisão do tempo por esporte: ' + cats.map((x) => x.n + ' ' + fmt(x.min / tempo * 100, 1) + '%').join(', ') },
             cats.map((x) => el('i', { style: 'width:' + (x.min / tempo * 100).toFixed(2) + '%;background:' + x.c, title: x.n }))),
@@ -312,7 +312,7 @@
       apr.assinatura ? el('p', { class: 'assinatura' }, el('b', { text: site.nome }), el('br'), apr.assinatura) : null)));
 
     frag.append(el('dl', { class: 'faixa' },
-      numero('Natação em ' + ano, fmt(km('Swim'), 1), 'km'), numero('Bike em ' + ano, fmt(km('Ride')), 'km'),
+      numero('Natação em ' + ano, fmt(km('Swim'), 1), 'km'), (kmConfiavel(doAno.filter((a) => a.tipo === 'Ride'), 'Ride') ? numero('Bike em ' + ano, fmt(km('Ride')), 'km') : numero('Bike em ' + ano, horas(soma(doAno.filter((a) => a.tipo === 'Ride'), (a) => a.tempo_min)), null, 'em horas: a maioria dos pedais é no rolo, sem distância')),
       numero('Corrida em ' + ano, fmt(km('Run')), 'km'), numero('Treinos em ' + ano, fmt(doAno.length))));
 
     // horas por mês
@@ -349,6 +349,12 @@
     const semanaAtual = segunda(h);
     const daSemana = doCiclo.filter((a) => segunda(a.data) === semanaAtual);
     const kmDe = (lista, e) => soma(lista.filter((a) => a.tipo === e), (a) => a.distancia_km);
+    // esportes com meta em horas (ex.: bike no rolo sem sensor de velocidade) são medidos em horas, não em km
+    const emHoras = (e) => prova.metas[e] && prova.metas[e].semanal_h != null;
+    const volDe = (lista, e) => emHoras(e) ? soma(lista.filter((a) => a.tipo === e), (a) => a.tempo_min) / 60 : kmDe(lista, e);
+    const un = (e) => emHoras(e) ? 'h' : 'km';
+    const metaSem = (e) => emHoras(e) ? prova.metas[e].semanal_h : prova.metas[e].semanal_km;
+    const metaMaior = (e) => emHoras(e) ? prova.metas[e].maior_h : prova.metas[e].maior_km;
     const dias = diasEntre(h, prova.data);
 
     // bricks: bike e corrida no mesmo dia
@@ -373,16 +379,16 @@
       const rb = secaoRitmos(prova, atividades); if (rb) frag.append(rb);
       frag.append(secao('Média por semana na base', 'Desde ' + dataLonga(prova.base.inicio) + '. Para comparar com a meta do ciclo, que começa depois.',
         el('div', { class: 'metas' }, esportes.map((e) => {
-          const v = kmDe(daBase, e) / semanasBase, alvo = prova.metas[e].semanal_km;
+          const v = volDe(daBase, e) / semanasBase, alvo = metaSem(e);
           return el('div', { class: 'meta-linha' }, el('span', { class: 'esporte', text: ESPORTES[e].nome }),
             el('div', { class: 'barra' }, el('i', { style: 'width:' + Math.min(100, alvo ? v / alvo * 100 : 0).toFixed(1) + '%' })),
-            el('span', { class: 'valor' }, el('b', { text: fmt(v, 1) }), ' km/sem. Meta do ciclo: ' + fmt(alvo) + ' km'));
+            el('span', { class: 'valor' }, el('b', { text: fmt(v, 1) }), ' ' + un(e) + '/sem. Meta do ciclo: ' + fmt(alvo, emHoras(e) ? 1 : 0) + ' ' + un(e)));
         }))));
       frag.append(secao('Treinos da base', null, tabelaTreinos(daBase.slice(-12).reverse())));
       $('#conteudo').replaceChildren(frag);
       return;
     }
-    const resumoSemana = esportes.map((e) => fmt(kmDe(daSemana, e), e === 'Swim' ? 1 : 0) + ' km de ' + ESPORTES[e].nome.toLowerCase());
+    const resumoSemana = esportes.map((e) => fmt(volDe(daSemana, e), e === 'Swim' || emHoras(e) ? 1 : 0) + ' ' + un(e) + ' de ' + ESPORTES[e].nome.toLowerCase());
     frag.append(el('p', { class: 'sub' }, dias >= 0 ? [el('b', { text: fmt(dias) }), ' dias para a largada, em ' + dataLonga(prova.data) + '. '] : 'Prova realizada em ' + dataLonga(prova.data) + '. ',
       'Nesta semana: ' + resumoSemana.join(', ').replace(/, ([^,]*)$/, ' e $1') + '.'));
     frag.append(el('dl', { class: 'faixa' },
@@ -395,17 +401,17 @@
     const barra = (v, alvo) => el('div', { class: 'barra' }, el('i', { style: 'width:' + Math.min(100, alvo ? v / alvo * 100 : 0).toFixed(1) + '%' }));
     frag.append(secao('Metas da semana', 'Semana de ' + dataCurta(semanaAtual) + ' a ' + dataCurta(somaDias(semanaAtual, 6)) + '.',
       el('div', { class: 'metas' }, esportes.map((e) => {
-        const v = kmDe(daSemana, e), alvo = prova.metas[e].semanal_km;
+        const v = volDe(daSemana, e), alvo = metaSem(e);
         return el('div', { class: 'meta-linha' }, el('span', { class: 'esporte', text: ESPORTES[e].nome }), barra(v, alvo),
-          el('span', { class: 'valor' }, el('b', { text: fmt(v, e === 'Swim' ? 1 : 0) }), ' de ' + fmt(alvo) + ' km'));
+          el('span', { class: 'valor' }, el('b', { text: fmt(v, e === 'Swim' || emHoras(e) ? 1 : 0) }), ' de ' + fmt(alvo, emHoras(e) ? 1 : 0) + ' ' + un(e)));
       }))));
 
     frag.append(secao('Treino mais longo do ciclo', 'Comparado com a meta e com a distância da prova.',
       el('div', { class: 'metas' }, esportes.map((e) => {
-        const maior = d3.max(doCiclo.filter((a) => a.tipo === e), (a) => a.distancia_km) || 0;
-        const alvo = prova.metas[e].maior_km, dist = (prova.distancias || {})[e];
+        const maior = d3.max(doCiclo.filter((a) => a.tipo === e), (a) => emHoras(e) ? a.tempo_min / 60 : a.distancia_km) || 0;
+        const alvo = metaMaior(e), dist = (prova.distancias || {})[e];
         return el('div', { class: 'meta-linha' }, el('span', { class: 'esporte', text: ESPORTES[e].nome }), barra(maior, alvo),
-          el('span', { class: 'valor' }, el('b', { text: fmt(maior, 1) }), ' de ' + fmt(alvo, 1) + ' km' + (dist ? '. Na prova: ' + fmt(dist, 1) + ' km' : '')));
+          el('span', { class: 'valor' }, el('b', { text: fmt(maior, 1) }), ' de ' + fmt(alvo, 1) + ' ' + un(e) + (dist ? '. Na prova: ' + fmt(dist, 1) + ' km' : '')));
       }))));
 
     // volume semanal por esporte
@@ -415,10 +421,10 @@
     const caixas = esportes.map((e) => {
       const box = el('div', { class: 'grafico' });
       multiplos.append(el('div', {}, el('h3', { text: ESPORTES[e].nome }), box));
-      const linhas = semanas.map((s) => ({ chave: s, rotulo: 'Semana de ' + dataCurta(s), [e]: Math.round(kmDe(doCiclo.filter((a) => segunda(a.data) === s), e) * 10) / 10 }));
-      return [box, () => barrasEmpilhadas(box, linhas, { unidade: 'km', esportes: [e], meta: prova.metas[e].semanal_km, fmtX: dataCurta, alt: 'Barras com os km de ' + ESPORTES[e].nome.toLowerCase() + ' em cada semana do ciclo e linha tracejada na meta semanal' })];
+      const linhas = semanas.map((s) => ({ chave: s, rotulo: 'Semana de ' + dataCurta(s), [e]: Math.round(volDe(doCiclo.filter((a) => segunda(a.data) === s), e) * 10) / 10 }));
+      return [box, () => barrasEmpilhadas(box, linhas, { unidade: un(e), esportes: [e], meta: metaSem(e), fmtX: dataCurta, alt: 'Barras com o volume de ' + ESPORTES[e].nome.toLowerCase() + ' em cada semana do ciclo e linha tracejada na meta semanal' })];
     });
-    frag.append(secao('Km por semana', 'Desde o início do ciclo, em ' + dataCurta(prova.inicio_ciclo) + '/' + prova.inicio_ciclo.slice(0, 4) + '. A linha tracejada é a meta semanal.', semanas.length ? multiplos : el('p', { class: 'vazio', text: 'O ciclo começa em ' + dataLonga(prova.inicio_ciclo) + '.' })));
+    frag.append(secao('Volume por semana', 'Desde o início do ciclo, em ' + dataCurta(prova.inicio_ciclo) + '/' + prova.inicio_ciclo.slice(0, 4) + '. A linha tracejada é a meta semanal.', semanas.length ? multiplos : el('p', { class: 'vazio', text: 'O ciclo começa em ' + dataLonga(prova.inicio_ciclo) + '.' })));
 
     frag.append(secao('Treinos do ciclo', null, tabelaTreinos(doCiclo.slice(-12).reverse())));
     $('#conteudo').replaceChildren(frag);
@@ -446,12 +452,31 @@
       numero('Sono', u.sono_h != null ? horas(u.sono_h * 60) : '—'), numero('HRV', fmt(u.hrv), 'ms'),
       numero('FC de repouso', fmt(u.fc_repouso), 'bpm'), numero('Forma', forma == null ? '—' : (forma > 0 ? '+' : '') + fmt(forma))));
 
+    // sono em destaque: média das últimas 7 e 30 noites contra a meta
+    const metaSono = ctx.site.meta_sono || 7;
+    const noites = ctx.bemEstar.filter((w) => w.sono_h);
+    const ult7 = noites.slice(-7), ult30 = noites.slice(-30);
+    if (ult7.length) {
+      const m7 = d3.mean(ult7, (w) => w.sono_h), m30 = d3.mean(ult30, (w) => w.sono_h);
+      const naMeta = ult30.filter((w) => w.sono_h >= metaSono).length, curtas = ult30.filter((w) => w.sono_h < 6).length;
+      const falta = Math.max(0, (metaSono - m7) * 7);
+      frag.append(secao('Sono', 'Meta: ' + metaSono + ' horas por noite. É o que mais pesa na recuperação.',
+        el('dl', { class: 'faixa' },
+          numero('Média 7 noites', horas(m7 * 60), null, falta > 0 ? 'faltam ' + horas(falta * 60) + ' na semana para a meta' : 'na meta'),
+          numero('Média 30 noites', horas(m30 * 60)),
+          numero('Noites na meta', fmt(naMeta), 'de ' + ult30.length, '' + metaSono + 'h ou mais, últimos 30 dias'),
+          numero('Noites curtas', fmt(curtas), 'de ' + ult30.length, 'menos de 6h, últimos 30 dias')),
+        el('div', { class: 'cumprido sono-barra' },
+          el('div', { class: 'cumprido-cab' }, el('span', { text: 'Média de 7 noites contra a meta' }), el('b', { text: Math.round(m7 / metaSono * 100) + '%' })),
+          el('div', { class: 'barra' }, el('i', { style: 'width:' + Math.min(100, m7 / metaSono * 100).toFixed(1) + '%' })))));
+    }
+
     const b1 = el('div', { class: 'grafico' }), b2 = el('div', { class: 'grafico' }), b3 = el('div', { class: 'grafico' });
     const leg = (itens) => el('ul', { class: 'legenda' }, itens.map(([estilo, t]) => el('li', {}, el('i', { style: estilo }), t)));
     frag.append(secao('Fitness, fadiga e forma', 'Fitness é a carga média dos últimos 42 dias, fadiga a dos últimos 7. Forma é a diferença: negativa quando você está carregado.',
       leg([['background:#fff', 'Fitness'], ['background:transparent;border-top:2px dashed #9a9a9a;height:0', 'Fadiga'], ['background:#3a3a3a', 'Forma']]), b1));
     frag.append(secao('HRV noturno', 'Cada ponto é uma noite. A linha é a média de 7 dias.', b2));
-    frag.append(secao('Horas de sono', 'Barras brancas: noites com 7 horas ou mais. A linha tracejada marca 8 horas.', b3));
+    frag.append(secao('Horas de sono', 'Barras brancas: noites com ' + metaSono + ' horas ou mais. A linha tracejada marca a meta.', b3));
     $('#conteudo').replaceChildren(frag);
 
     agendar(b1, () => linhasTempo(b1, serie, {
@@ -478,8 +503,8 @@
       desenhar: (svg, dados, x, y) => {
         const bw = Math.max(1, (x.range()[1] - x.range()[0]) / dados.length - 1);
         svg.append('g').selectAll('rect').data(dados).join('rect').attr('x', (d) => x(d.t) - bw / 2).attr('width', bw)
-          .attr('y', (d) => y(d.sono_h)).attr('height', (d) => y(0) - y(d.sono_h)).attr('fill', (d) => d.sono_h >= 7 ? '#fff' : '#4a4a4a');
-        svg.append('line').attr('x1', x.range()[0]).attr('x2', x.range()[1]).attr('y1', y(8)).attr('y2', y(8)).attr('stroke', '#fff').attr('stroke-dasharray', '4 4');
+          .attr('y', (d) => y(d.sono_h)).attr('height', (d) => y(0) - y(d.sono_h)).attr('fill', (d) => d.sono_h >= metaSono ? '#fff' : '#4a4a4a');
+        svg.append('line').attr('x1', x.range()[0]).attr('x2', x.range()[1]).attr('y1', y(metaSono)).attr('y2', y(metaSono)).attr('stroke', '#fff').attr('stroke-dasharray', '4 4');
       },
     }));
   }
@@ -492,6 +517,8 @@
     const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
     return 1 + Math.round(((d - jan4) / 864e5 - 3 + ((jan4.getUTCDay() + 6) % 7)) / 7);
   };
+  // km da bike só é confiável se todos os pedais têm distância (no rolo sem sensor não tem)
+  const kmConfiavel = (lista, tipo) => tipo === 'Ride' ? lista.length > 0 && lista.every((a) => a.distancia_km > 0) : lista.some((a) => a.distancia_km > 0);
   const distTxt = (a) => !a.distancia_km ? null : a.tipo === 'Swim' ? fmt(a.distancia_km * 1000) + ' m' : fmt(a.distancia_km, 1) + ' km';
 
   function cartaoTreino(a) {
@@ -537,7 +564,14 @@
     const semana = (seg, mes) => {
       const dias = [...Array(7)].map((_, i) => somaDias(seg, i));
       const doSem = dias.flatMap((d) => porDia.get(d) || []);
-      const planSem = dias.filter((d) => d >= h).flatMap((d) => planDia.get(d) || []);
+      const planSem = dias.flatMap((d) => planDia.get(d) || []);
+      // cumprimento: TSS feito contra TSS planejado nos dias que já chegaram (até hoje)
+      // hoje só entra na conta depois que algum treino do dia foi registrado
+      const contaDia = (d) => d < h || (d === h && porDia.has(d));
+      const planAteHoje = dias.filter(contaDia).flatMap((d) => planDia.get(d) || []);
+      const tssPlanAteHoje = soma(planAteHoje, (p) => p.carga), tssFeito = soma(doSem, (a) => a.carga);
+      const tssFeitoConta = soma(dias.filter(contaDia).flatMap((d) => porDia.get(d) || []), (a) => a.carga);
+      const cumprido = tssPlanAteHoje ? Math.round(tssFeitoConta / tssPlanAteHoje * 100) : null;
       const ultimoBE = dias.map((d) => be.get(d)).filter((w) => w && w.ctl != null).pop();
       const porEsporte = ['Ride', 'Run', 'Swim', 'Strength', 'Other'].map((t) => {
         const l = doSem.filter((a) => (ROTULO[a.tipo] ? a.tipo : 'Other') === t);
@@ -547,14 +581,17 @@
         el('h3', {}, 'Sem. ' + semanaISO(seg), el('small', { text: dataCurta(seg) + ' a ' + dataCurta(dias[6]) })),
         el('dl', {},
           el('div', {}, el('dt', { text: 'Feito' }), el('dd', { text: horas(soma(doSem, (a) => a.tempo_min)) })),
-          el('div', {}, el('dt', { text: 'Carga' }), el('dd', { text: fmt(soma(doSem, (a) => a.carga)) })),
-          planSem.length ? el('div', {}, el('dt', { text: 'Planejado' }), el('dd', { text: horas(soma(planSem, (p) => p.tempo_min)) })) : null,
-          el('div', {}, el('dt', { text: 'Distância' }), el('dd', { text: fmt(soma(doSem, (a) => a.distancia_km), 1) + ' km' })),
+          el('div', {}, el('dt', { text: 'TSS feito' }), el('dd', { text: fmt(tssFeito) })),
+          planSem.length ? el('div', {}, el('dt', { text: 'Plano' }), el('dd', { text: horas(soma(planSem, (p) => p.tempo_min)) })) : null,
+          planSem.length ? el('div', {}, el('dt', { text: 'TSS plano' }), el('dd', { text: fmt(soma(planSem, (p) => p.carga)) })) : null,
           ultimoBE ? el('div', {}, el('dt', { text: 'Forma' }), el('dd', { text: fmt(ultimoBE.ctl - ultimoBE.atl) })) : null,
           ultimoBE ? el('div', {}, el('dt', { text: 'Fitness' }), el('dd', { text: fmt(ultimoBE.ctl) })) : null),
+        cumprido != null ? el('div', { class: 'cumprido', title: 'TSS feito dividido pelo TSS planejado nos dias até hoje' },
+          el('div', { class: 'cumprido-cab' }, el('span', { text: dias[6] < h ? 'Cumprido' : 'Cumprido até hoje' }), el('b', { text: cumprido + '%' })),
+          el('div', { class: 'barra' }, el('i', { style: 'width:' + Math.min(100, cumprido) + '%' }))) : null,
         porEsporte.length ? el('table', { class: 'sem-esportes' },
           el('tbody', {}, porEsporte.map((x) => el('tr', {}, el('td', { text: ROTULO[x.t] }), el('td', { class: 'n', text: horas(x.min) }),
-            el('td', { class: 'n', text: x.km ? fmt(x.km, x.t === 'Swim' ? 1 : 0) + ' km' : '—' }), el('td', { class: 'n', text: x.carga ? String(Math.round(x.carga)) : '—' }))))) : null);
+            el('td', { class: 'n', text: kmConfiavel(x.l, x.t) ? fmt(x.km, x.t === 'Swim' ? 1 : 0) + ' km' : '—' }), el('td', { class: 'n', text: x.carga ? String(Math.round(x.carga)) : '—' }))))) : null);
       const grade = el('div', { class: 'sem-dias' }, dias.map((d, i) => {
         const w = be.get(d), treinos = porDia.get(d) || [], plan = planDia.get(d) || [];
         // planejado de um dia passado só aparece se não houve treino do mesmo esporte (fica marcado como feito)
