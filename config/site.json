@@ -17,5 +17,17 @@
     "assinatura": "Manaus · Equipe Unity · 2026"
   },
   "provas_concluidas": [],
-  "meta_sono": 7
+  "meta_sono": 7,
+  "fotos": [
+    {
+      "src": "assets/foto.jpg",
+      "alt": "Josivan correndo descalço com touca e óculos de natação, na transição de um triathlon.",
+      "legenda": "Transição · triathlon"
+    },
+    {
+      "src": "assets/foto-chegada.jpg",
+      "alt": "Josivan comemorando na chegada do Circuito das Estações 2026, na Ponta Negra, com o relógio marcando 22:27.",
+      "legenda": "Circuito das Estações · Ponta Negra, Manaus"
+    }
+  ]
 }

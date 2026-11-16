@@ -230,3 +230,31 @@ img{max-width:100%}
 .sono-barra{max-width:520px;margin-top:20px}
 .sono-barra .cumprido-cab{font-size:14px}
 .sono-barra .cumprido-cab b{font-size:22px}
+
+/* capa com duas fotos, uma de cada lado do nome */
+.hero-duplo{grid-template-columns:minmax(140px,24%) minmax(0,1fr) minmax(140px,24%);align-items:center}
+.hero-duplo .hero-texto{text-align:center}
+.hero-duplo .sub{margin-left:auto;margin-right:auto}
+.hero-duplo .hero-foto{aspect-ratio:3/4}
+.hero-duplo .titulo{font-size:clamp(56px,10vw,160px)}
+.hero-foto{position:relative}
+.hero-foto figcaption{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--cinza-4);background:linear-gradient(transparent,rgba(0,0,0,.85))}
+@media (max-width:720px){
+  .hero-duplo{grid-template-columns:1fr 1fr;gap:10px}
+  .hero-duplo .hero-texto{grid-column:1 / -1;grid-row:2;margin-top:14px}
+  .hero-duplo .hero-foto{order:0;aspect-ratio:3/4;margin:0}
+}
+
+/* geografia */
+.geo{border:1px solid var(--cinza-2);background:#050505}
+.geo-mapa{height:clamp(320px,52vw,520px);background:#0b0b0b}
+.geo-mapa .leaflet-container,.geo-mapa{font-family:var(--fonte)}
+.geo-ponto{display:flex!important;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.88);color:#000;font-weight:800;font-size:12px;box-shadow:0 0 0 4px rgba(255,255,255,.18)}
+.geo-fatos{padding:14px 18px 18px;border-top:1px solid var(--cinza-2)}
+.geo-rot{margin:10px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cinza-3)}
+.geo-linha{margin:0;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;color:var(--cinza-4);font-variant-numeric:tabular-nums}
+.geo-linha b{color:var(--branco)}
+.leaflet-control-attribution{background:rgba(0,0,0,.6)!important;color:var(--cinza-3)!important}
+.leaflet-control-attribution a{color:var(--cinza-4)!important}
+.geo-mapa .leaflet-tile-pane{filter:grayscale(1) invert(1) brightness(.85) contrast(.9)}
+.geo-mapa.leaflet-container{background:#0b0b0b}

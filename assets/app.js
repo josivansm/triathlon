@@ -286,8 +286,13 @@
       el('h1', { class: 'titulo', text: site.nome }),
       site.equipe ? el('p', { class: 'equipe', text: site.equipe }) : null,
       el('p', { class: 'sub' }, site.subtitulo + ' Em ' + ano + ': ', el('b', { text: horas(soma(doAno, (a) => a.tempo_min)) }), ' de treino em ', el('b', { text: fmt(doAno.length) }), ' sessões.'));
-    frag.append(site.foto ? el('div', { class: 'hero' }, textoHero,
-      el('figure', { class: 'hero-foto' }, el('img', { src: site.foto, alt: site.foto_alt || ('Foto de ' + site.nome), loading: 'eager', decoding: 'async' }))) : textoHero);
+    // uma foto: ao lado do nome. Duas fotos: uma de cada lado, como uma capa.
+    const fotos = (site.fotos && site.fotos.length ? site.fotos : site.foto ? [{ src: site.foto, alt: site.foto_alt }] : []).slice(0, 2);
+    const figura = (f) => el('figure', { class: 'hero-foto' }, el('img', { src: f.src, alt: f.alt || ('Foto de ' + site.nome), loading: 'eager', decoding: 'async' }),
+      f.legenda ? el('figcaption', { text: f.legenda }) : null);
+    if (fotos.length === 2) frag.append(el('div', { class: 'hero hero-duplo' }, figura(fotos[0]), textoHero, figura(fotos[1])));
+    else if (fotos.length === 1) frag.append(el('div', { class: 'hero' }, textoHero, figura(fotos[0])));
+    else frag.append(textoHero);
 
     // números de toda a história, com comparações
     const kmTotal = soma(atividades, (a) => a.distancia_km), minTotal = soma(atividades, (a) => a.tempo_min), subida = soma(atividades, (a) => a.elevacao_m);
@@ -337,6 +342,7 @@
     if (concluidas.length) frag.append(secao('Provas', 'Resultados oficiais, com as parciais de cada etapa.', resultados(concluidas, atividades)));
 
     frag.append(secao('Atividades recentes', null, atividadesRecentes(atividades)));
+    const geo = secaoGeografia(atividades, ctx.locais); if (geo) frag.append(geo);
     $('#conteudo').replaceChildren(frag);
     agendar(boxMes, () => barrasEmpilhadas(boxMes, meses, { unidade: 'h', fmtX: (k) => MESES[+k.slice(5, 7) - 1], alt: 'Barras empilhadas com as horas de natação, bike e corrida em cada um dos últimos 12 meses' }));
   }
@@ -509,6 +515,70 @@
     }));
   }
 
+  // ---------- geografia: onde os treinos acontecem (locais arredondados a ~11 km) ----------
+  const distanciaKm = (a, b) => {
+    const r = Math.PI / 180, dLat = (b[0] - a[0]) * r, dLng = (b[1] - a[1]) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLng / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(h));
+  };
+  const coord = (p) => fmt(Math.abs(p[0]), 1) + '°' + (p[0] < 0 ? 'S' : 'N') + ', ' + fmt(Math.abs(p[1]), 1) + '°' + (p[1] < 0 ? 'O' : 'L');
+  let leafletPronto = null;
+  const carregarLeaflet = () => leafletPronto || (leafletPronto = new Promise((ok, falha) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.append(css);
+    const js = document.createElement('script');
+    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    js.onload = () => ok(window.L); js.onerror = falha;
+    document.head.append(js);
+  }));
+
+  function secaoGeografia(atividades, locais) {
+    const grupos = new Map();
+    for (const a of atividades) {
+      const p = locais && locais[a.id];
+      if (!p) continue;
+      const k = p.join(',');
+      if (!grupos.has(k)) grupos.set(k, { p, n: 0, tipos: {} });
+      const g = grupos.get(k); g.n++; g.tipos[a.tipo] = (g.tipos[a.tipo] || 0) + 1;
+    }
+    if (!grupos.size) return null;
+    const lista = [...grupos.values()].sort((a, b) => b.n - a.n);
+    const casa = lista[0].p;
+    const longe = lista.reduce((m, g) => { const d = distanciaKm(casa, g.p); return d > m.d ? { d, g } : m; }, { d: 0, g: null });
+    const totalGps = soma(lista, (g) => g.n);
+
+    const mapa = el('div', { class: 'geo-mapa', role: 'img', 'aria-label': 'Mapa com ' + lista.length + ' locais de treino; o principal tem ' + lista[0].n + ' treinos.' });
+    const caixa = el('div', { class: 'geo' }, mapa,
+      el('div', { class: 'geo-fatos' },
+        el('p', { class: 'geo-rot', text: 'Onde mais treino' }),
+        el('p', { class: 'geo-linha' }, lista.slice(0, 4).map((g) => el('span', {}, el('b', { text: fmt(g.n) }), ' em ' + coord(g.p)))),
+        el('p', { class: 'geo-rot', text: 'Fatos' }),
+        el('p', { class: 'geo-linha' },
+          el('span', {}, el('b', { text: fmt(lista.length) }), lista.length === 1 ? ' local' : ' locais diferentes'),
+          el('span', {}, el('b', { text: fmt(totalGps) }), ' treinos com GPS'),
+          longe.g ? el('span', {}, 'Mais longe de casa: ', el('b', { text: fmt(longe.d) + ' km' })) : null)));
+
+    carregarLeaflet().then((L) => {
+      if (!mapa.isConnected) return;
+      const m = L.map(mapa, { scrollWheelZoom: false, zoomControl: true, attributionControl: true });
+      // mapa livre do OpenStreetMap, escurecido em preto e branco pelo CSS (.geo-mapa .leaflet-tile-pane)
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 14, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(m);
+      const maior = lista[0].n;
+      for (const g of lista) {
+        const d = Math.round(24 + 34 * Math.sqrt(g.n / maior));
+        const dica = Object.entries(g.tipos).map(([t, n]) => n + ' ' + (ROTULO[t] || t).toLowerCase()).join(', ');
+        L.marker(g.p, { icon: L.divIcon({ className: 'geo-ponto', html: String(g.n), iconSize: [d, d] }), title: g.n + ' treinos: ' + dica, keyboard: false, zIndexOffset: g.n }).addTo(m);
+      }
+      if (lista.length === 1) m.setView(casa, 10);
+      else m.fitBounds(lista.map((g) => g.p), { padding: [40, 40], maxZoom: 11 });
+    }).catch(() => { mapa.replaceChildren(el('p', { class: 'vazio', text: 'Não foi possível carregar o mapa agora.' })); });
+
+    return secao('Geografia', 'Onde eu treino. Cada ponto junta os treinos num raio de uns 10 km: o mapa mostra a cidade, nunca a rota.', caixa);
+  }
+
   // ---------- calendário semanal ----------
   const DIAS_SEMANA = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
   const ROTULO = { Run: 'Corrida', Ride: 'Bike', Swim: 'Natação', Strength: 'Musculação', Other: 'Outro' };
@@ -669,16 +739,16 @@
 
   async function iniciar() {
     try {
-      const [site, provas, atividades, bemEstar, meta, planejadosSync, planejadosManual] = await Promise.all([
+      const [site, provas, atividades, bemEstar, meta, planejadosSync, planejadosManual, locais] = await Promise.all([
         carregar('config/site.json'), carregar('config/provas.json'), carregar('data/atividades.json'),
-        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []), carregar('config/planejados.json').catch(() => []),
+        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []), carregar('config/planejados.json').catch(() => []), carregar('data/locais.json').catch(() => ({})),
       ]);
       atividades.sort((a, b) => a.data.localeCompare(b.data));
       bemEstar.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
       // planejados: os do Intervals.icu/TrainingPeaks (sync) + os que você envia à mão em config/planejados.json
       const planejados = [...planejadosSync, ...planejadosManual.map((p) => ({ fonte: 'Garmin', ...p }))].filter((p) => p && p.data);
       planejados.sort((a, b) => a.data.localeCompare(b.data));
-      const ctx = { site, provas, atividades, bemEstar, meta, planejados };
+      const ctx = { site, provas, atividades, bemEstar, meta, planejados, locais };
 
       const h = hojeISO();
       const ativas = provas.filter((p) => p.data >= h || diasEntre(p.data, h) <= 30).sort((a, b) => a.data.localeCompare(b.data));

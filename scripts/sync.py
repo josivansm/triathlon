@@ -31,12 +31,12 @@ TIPOS = {
 }
 
 
-def pedir(caminho, params):
+def pedir(caminho, params, base=None):
     chave = os.environ.get("INTERVALS_API_KEY", "").strip()
     if not chave:
         sys.exit("Falta a variável INTERVALS_API_KEY. No GitHub, crie o segredo em Settings > Secrets and variables > Actions.")
     query = "&".join(f"{k}={v}" for k, v in params.items())
-    req = urllib.request.Request(f"{API}{caminho}?{query}")
+    req = urllib.request.Request(f"{base or API}{caminho}?{query}")
     # O usuário é literalmente o texto API_KEY; a senha é a sua chave.
     token = base64.b64encode(f"API_KEY:{chave}".encode()).decode()
     req.add_header("Authorization", f"Basic {token}")
@@ -47,12 +47,47 @@ def pedir(caminho, params):
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
+        if e.code in (401, 403) and base is None:  # nos pedidos do mapa, um erro só pula aquele treino
             detalhe = e.read(300).decode("utf-8", "replace").strip()
             sys.exit("O Intervals.icu recusou o pedido (erro %d) em %s. Confira o segredo INTERVALS_API_KEY "
                      "(deve ser a API Key de Settings > Developer Settings, não o ID do atleta) e o atleta_id em config/site.json.\n"
                      "Resposta do servidor: %s" % (e.code, API, detalhe))
         raise
+
+
+def local_aproximado(id_atividade):
+    """Centro da área do treino, arredondado a 0,1° (cerca de 11 km): mostra a cidade, nunca a rota nem o endereço."""
+    try:
+        m = pedir(f"/activity/{id_atividade}/map", {"boundsOnly": "true"}, base="https://intervals.icu/api/v1")
+    except Exception:
+        return None  # treino sem GPS (rolo, piscina, academia) ou mapa indisponível
+    b = (m or {}).get("bounds") if isinstance(m, dict) else None
+    try:
+        lat, lng = (b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2
+    except (TypeError, IndexError, KeyError):
+        return None
+    return [round(lat, 1), round(lng, 1)]
+
+
+def atualizar_locais(atividades, virtuais, limite=500):
+    """Guarda em data/locais.json o local aproximado de cada treino ao ar livre. Só busca os que ainda não estão lá."""
+    arquivo = DADOS / "locais.json"
+    locais = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
+    novos = 0
+    for a in atividades:
+        if a["id"] in locais or not a.get("distancia_km") or a["tipo"] not in ("Run", "Ride", "Swim"):
+            continue
+        if a["id"] in virtuais:
+            locais[a["id"]] = None
+            continue
+        if novos >= limite:
+            break
+        locais[a["id"]] = local_aproximado(a["id"])
+        novos += 1
+    ids = {a["id"] for a in atividades}
+    locais = {k: v for k, v in locais.items() if k in ids}
+    arquivo.write_text(json.dumps(locais, separators=(",", ":")), encoding="utf-8")
+    print(f"{novos} treinos consultados para o mapa; {sum(1 for v in locais.values() if v)} com local.")
 
 
 def periodos(inicio, fim, dias=180):
@@ -135,13 +170,15 @@ def main():
     inicio = dt.date.fromisoformat(site.get("historico_desde", "2025-01-01"))
     hoje = dt.date.today()
 
-    atividades, puladas_strava = [], 0
+    atividades, puladas_strava, virtuais = [], 0, set()
     for a, b in periodos(inicio, hoje):
         for x in pedir("/activities", {"oldest": a.isoformat(), "newest": b.isoformat()}):
             if x.get("_note") or x.get("source") == "STRAVA":
                 puladas_strava += 1  # o Intervals.icu não repassa treinos que vieram do Strava
                 continue
             tipo = TIPOS.get(x.get("type") or "", "Other")
+            if (x.get("type") or "").startswith("Virtual") or x.get("trainer"):
+                virtuais.add(str(x.get("id")))  # rolo/esteira: sem local
             atividades.append({
                 "id": str(x.get("id")),
                 "data": (x.get("start_date_local") or "")[:10],
@@ -199,6 +236,7 @@ def main():
     escrever("atividades.json", atividades)
     escrever("bem_estar.json", bem_estar)
     escrever("planejados.json", planejados)
+    atualizar_locais(atividades, virtuais)
     print(f"{len(planejados)} treinos planejados salvos.")
     escrever("meta.json", {
         "atualizado_em": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
