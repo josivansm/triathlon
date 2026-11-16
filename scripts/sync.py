@@ -18,7 +18,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 DADOS = RAIZ / "data"
-API = "https://intervals.icu/api/v1/athlete/0"  # 0 = a sua própria conta
+API_BASE = "https://intervals.icu/api/v1/athlete/"
+API = API_BASE + "0"  # trocado em main() pelo "atleta_id" de config/site.json, se houver
 
 TIPOS = {
     "Run": "Run", "TrailRun": "Run", "VirtualRun": "Run",
@@ -39,12 +40,17 @@ def pedir(caminho, params):
     token = base64.b64encode(f"API_KEY:{chave}".encode()).decode()
     req.add_header("Authorization", f"Basic {token}")
     req.add_header("Accept", "application/json")
+    # Sem um User-Agent próprio, o firewall do Intervals.icu pode bloquear o pedido (erro 403).
+    req.add_header("User-Agent", "site-treinos-sync/1.0")
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.load(r)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
-            sys.exit("O Intervals.icu recusou a chave (erro %d). Confira o segredo INTERVALS_API_KEY." % e.code)
+            detalhe = e.read(300).decode("utf-8", "replace").strip()
+            sys.exit("O Intervals.icu recusou o pedido (erro %d) em %s. Confira o segredo INTERVALS_API_KEY "
+                     "(deve ser a API Key de Settings > Developer Settings, não o ID do atleta) e o atleta_id em config/site.json.\n"
+                     "Resposta do servidor: %s" % (e.code, API, detalhe))
         raise
 
 
@@ -62,7 +68,9 @@ def numero(v, casas=1):
 
 
 def main():
+    global API
     site = json.loads((RAIZ / "config" / "site.json").read_text(encoding="utf-8"))
+    API = API_BASE + str(site.get("atleta_id") or "0").strip()
     inicio = dt.date.fromisoformat(site.get("historico_desde", "2025-01-01"))
     hoje = dt.date.today()
 
