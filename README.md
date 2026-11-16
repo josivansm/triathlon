@@ -74,6 +74,14 @@ Edite direto no GitHub (abra o arquivo e clique no lápis):
 - `maior_km`: meta para o treino mais longo do ciclo.
 - A data do 70.3 Rio (8/8/2027) veio de calendários não oficiais. Confirme no site da Unlimited Sports.
 
+**`config/planejados.json`**: treinos planejados que você coloca à mão (por exemplo, uma vez por mês, a partir do calendário do Garmin ou do TrainingPeaks). Aparecem no Calendário com borda tracejada. `tipo` é `Run`, `Ride`, `Swim`, `Strength` ou `Other`; `tempo_min`, `distancia_km` e `descricao` são opcionais:
+
+```json
+[
+  { "data": "2026-12-01", "tipo": "Run", "nome": "Rodagem Z2", "tempo_min": 45, "distancia_km": 8, "descricao": "10 min aquecimento, 30 min Z2, 5 min solto" }
+]
+```
+
 ## Domínio próprio (opcional)
 
 Compre um domínio (ex.: `seunome.com`), vá em **Settings → Pages → Custom domain** e siga as instruções de DNS do GitHub.

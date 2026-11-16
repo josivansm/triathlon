@@ -630,12 +630,14 @@
 
   async function iniciar() {
     try {
-      const [site, provas, atividades, bemEstar, meta, planejados] = await Promise.all([
+      const [site, provas, atividades, bemEstar, meta, planejadosSync, planejadosManual] = await Promise.all([
         carregar('config/site.json'), carregar('config/provas.json'), carregar('data/atividades.json'),
-        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []),
+        carregar('data/bem_estar.json'), carregar('data/meta.json').catch(() => ({})), carregar('data/planejados.json').catch(() => []), carregar('config/planejados.json').catch(() => []),
       ]);
       atividades.sort((a, b) => a.data.localeCompare(b.data));
       bemEstar.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+      // planejados: os do Intervals.icu/TrainingPeaks (sync) + os que você envia à mão em config/planejados.json
+      const planejados = [...planejadosSync, ...planejadosManual.map((p) => ({ fonte: 'Garmin', ...p }))].filter((p) => p && p.data);
       planejados.sort((a, b) => a.data.localeCompare(b.data));
       const ctx = { site, provas, atividades, bemEstar, meta, planejados };
 

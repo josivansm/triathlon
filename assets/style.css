@@ -154,7 +154,8 @@ td.n,th.n{text-align:right}
 .sem-dias{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;padding-top:10px}
 .dia{min-height:120px;display:flex;flex-direction:column;gap:6px;padding:6px;background:#0b0b0b;border:1px solid var(--cinza-1)}
 .dia.hoje{border-color:var(--branco)}
-.dia.futuro{opacity:.45}
+.dia.futuro .dia-cab{opacity:.55}
+.dia.futuro.sem-nada{opacity:.45}
 .dia-cab{font-size:12px;color:var(--cinza-3);text-align:center}
 .dia-cab .dn{text-transform:uppercase;font-weight:700;color:var(--cinza-4)}
 .dia.hoje .dia-cab{color:var(--branco)}
