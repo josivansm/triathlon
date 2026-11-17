@@ -20,7 +20,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
+<script>
+  // versão nos arquivos do site, para o navegador pegar a mais nova em até 10 minutos depois de cada atualização
+  window.VERSAO_SITE = Math.floor(Date.now() / 6e5);
+  document.write('<link rel="stylesheet" href="assets/style.css?v=' + window.VERSAO_SITE + '">');
+</script>
+<noscript><link rel="stylesheet" href="assets/style.css"></noscript>
 </head>
 <body>
 <div class="pagina">
@@ -30,6 +35,12 @@
   <footer class="rodape" id="rodape"></footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-<script src="assets/app.js"></script>
+<script>
+  (function () {
+    var s = document.createElement('script');
+    s.src = 'assets/app.js?v=' + window.VERSAO_SITE;
+    document.body.appendChild(s);
+  })();
+</script>
 </body>
 </html>

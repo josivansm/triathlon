@@ -266,6 +266,7 @@ def main():
                 "elevacao_m": round(x.get("total_elevation_gain") or 0),
                 "fc_media": round(x["average_heartrate"]) if x.get("average_heartrate") else None,
                 "carga": round(x["icu_training_load"]) if x.get("icu_training_load") else None,
+                "calorias": round(x["calories"]) if x.get("calories") else None,
             })
     atividades.sort(key=lambda r: r["data"])
 

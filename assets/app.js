@@ -62,7 +62,7 @@
   }
 
   // Barras empilhadas por esporte. linhas: [{chave, rotulo, Swim, Ride, Run}]
-  function barrasEmpilhadas(box, linhas, { unidade, fmtX, meta, esportes = ORDEM, alt }) {
+  function barrasEmpilhadas(box, linhas, { unidade, fmtX, meta, esportes = ORDEM, alt, nomes = {} }) {
     box.replaceChildren();
     const W = Math.max(280, box.clientWidth), H = 240, m = { t: 12, r: 6, b: 26, l: 38 };
     const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('width', '100%').attr('role', 'img').attr('aria-label', alt);
@@ -87,7 +87,7 @@
       .on('pointerenter pointermove', (ev, d) => {
         t.text('');
         t.append('b').text(d.rotulo);
-        esportes.forEach((e) => { if (d[e]) t.append('div').text(ESPORTES[e].nome + ': ' + fmt(d[e], 1) + ' ' + unidade); });
+        esportes.forEach((e) => { if (d[e]) t.append('div').text((nomes[e] || ESPORTES[e].nome) + ': ' + fmt(d[e], e === 'cal' ? 0 : 1) + ' ' + unidade); });
         if (esportes.length > 1) t.append('div').text('Total: ' + fmt(soma(esportes, (e) => d[e]), 1) + ' ' + unidade);
         posDica(t, ev, box);
       })
@@ -154,7 +154,8 @@
   }
   // ritmo médio real (ponderado pela distância) de um esporte numa lista de treinos
   function ritmoReal(lista, e) {
-    const l = lista.filter((a) => a.tipo === e && a.distancia_km > 0 && a.tempo_min > 0);
+    // corridas mais lentas que 9 min/km são quase sempre caminhadas registradas como corrida: ficam fora da média
+    const l = lista.filter((a) => a.tipo === e && a.distancia_km > 0 && a.tempo_min > 0 && !(e === 'Run' && a.tempo_min / a.distancia_km > 9));
     const km = soma(l, (a) => a.distancia_km), seg = soma(l, (a) => a.tempo_min) * 60;
     if (!km) return null;
     return e === 'Ride' ? km / (seg / 3600) : seg / (e === 'Swim' ? km * 10 : km);
@@ -789,14 +790,143 @@
     $('#conteudo').replaceChildren(frag);
   }
 
+  // ---------- análise: período livre, planejado × feito por esporte, divisão do tempo, calorias ----------
+  let periodoAnalise = null, metricaAnalise = 'tempo';
+  const METRICAS = {
+    tempo: { rotulo: 'Tempo', valor: (l) => soma(l, (a) => a.tempo_min), fmt: (v) => horas(v) },
+    distancia: { rotulo: 'Distância', valor: (l) => soma(l, (a) => a.distancia_km), fmt: (v) => fmt(v, v < 10 ? 1 : 0) + ' km' },
+    tss: { rotulo: 'TSS', valor: (l) => soma(l, (a) => a.carga), fmt: (v) => fmt(v) },
+  };
+
+  function paginaAnalise(ctx) {
+    const { atividades, provas } = ctx, planejados = ctx.planejados || [], h = hojeISO();
+    const prova = proximaProva(provas);
+    const atalhos = [
+      ['4 semanas', somaDias(segunda(h), -21), h], ['12 semanas', somaDias(segunda(h), -77), h],
+      ['Este mês', h.slice(0, 8) + '01', h], ['No ano', h.slice(0, 4) + '-01-01', h],
+      prova && prova.base ? ['Período base', prova.base.inicio, h] : null,
+      planejados.length ? ['Com plano', planejados[0].data, planejados[planejados.length - 1].data] : null,
+    ].filter(Boolean);
+    if (!periodoAnalise) periodoAnalise = { de: atalhos[0][1], ate: atalhos[0][2] };
+
+    const frag = document.createDocumentFragment();
+    frag.append(el('h1', { class: 'titulo', text: 'Análise' }));
+    frag.append(el('p', { class: 'sub', text: 'Escolha um período e compare o que foi planejado com o que foi feito, esporte por esporte.' }));
+    const controles = el('div', { class: 'analise-controles' });
+    const corpo = el('div', {});
+    frag.append(controles, corpo);
+
+    const campoData = (rotulo, chave) => {
+      const i = el('input', { type: 'date', value: periodoAnalise[chave], min: atividades.length ? atividades[0].data : null, 'aria-label': rotulo });
+      i.onchange = () => { if (i.value) { periodoAnalise[chave] = i.value; if (periodoAnalise.de > periodoAnalise.ate) periodoAnalise[chave === 'de' ? 'ate' : 'de'] = i.value; desenhar(); } };
+      return el('label', { class: 'campo-data' }, el('span', { text: rotulo }), i);
+    };
+
+    function desenhar() {
+      const { de, ate } = periodoAnalise;
+      controles.replaceChildren(
+        el('div', { class: 'filtros', role: 'group', 'aria-label': 'Período' }, atalhos.map(([n, a, b]) => {
+          const bt = el('button', { type: 'button', class: 'filtro', text: n, 'aria-pressed': a === de && b === ate ? 'true' : 'false' });
+          bt.onclick = () => { periodoAnalise = { de: a, ate: b }; desenhar(); }; return bt;
+        })),
+        el('div', { class: 'analise-datas' }, campoData('De', 'de'), campoData('Até', 'ate'),
+          el('div', { class: 'filtros', role: 'group', 'aria-label': 'Medida' }, Object.entries(METRICAS).map(([k, m]) => {
+            const bt = el('button', { type: 'button', class: 'filtro', text: m.rotulo, 'aria-pressed': k === metricaAnalise ? 'true' : 'false' });
+            bt.onclick = () => { metricaAnalise = k; desenhar(); }; return bt;
+          }))));
+
+      const feitos = atividades.filter((a) => a.data >= de && a.data <= ate);
+      const plano = planejados.filter((p) => p.data >= de && p.data <= ate);
+      const M = METRICAS[metricaAnalise];
+      const tipoDe = (x) => ROTULO[x.tipo] ? x.tipo : 'Other';
+      // com plano, a comparação usa só os dias que têm plano (do primeiro ao último treino planejado no período)
+      const jIni = plano.length ? plano[0].data : de, jFim = plano.length ? plano[plano.length - 1].data : ate;
+      const comparados = plano.length ? feitos.filter((a) => a.data >= jIni && a.data <= jFim) : feitos;
+      // o cumprimento só conta dias que já chegaram; hoje entra depois que algum treino do dia foi registrado
+      const temTreino = new Set(feitos.map((a) => a.data));
+      const conta = (d) => d < h || (d === h && temTreino.has(d));
+      const linhas = ['Run', 'Ride', 'Swim', 'Strength', 'Other'].map((t) => {
+        const f = comparados.filter((a) => tipoDe(a) === t), p = plano.filter((x) => tipoDe(x) === t);
+        const pAte = p.filter((x) => conta(x.data)), fAte = f.filter((a) => conta(a.data));
+        return { t, f, p, vf: M.valor(f), vp: M.valor(p), pct: M.valor(pAte) ? Math.round(M.valor(fAte) / M.valor(pAte) * 100) : null };
+      }).filter((l) => l.vf > 0 || l.vp > 0);
+      const maior = d3.max(linhas, (l) => Math.max(l.vf, l.vp)) || 1;
+      const totF = M.valor(feitos), totP = M.valor(plano);
+      const planAte = plano.filter((x) => conta(x.data)), feitoAte = comparados.filter((a) => conta(a.data));
+      const cumprido = M.valor(planAte) ? Math.round(M.valor(feitoAte) / M.valor(planAte) * 100) : null;
+      const dias = diasEntre(de, ate) + 1;
+
+      const resumo = el('dl', { class: 'faixa' },
+        numero('Treinos feitos', fmt(feitos.length), null, fmt(dias) + (dias === 1 ? ' dia' : ' dias') + ' · ' + dataCurta(de) + ' a ' + dataCurta(ate)),
+        numero(M.rotulo + ' feito', M.fmt(totF)),
+        numero(M.rotulo + ' planejado', plano.length ? M.fmt(totP) : '—', null, plano.length ? fmt(plano.length) + ' treinos no plano' : 'sem plano neste período'),
+        numero('Cumprido', cumprido != null ? cumprido + '%' : '—', null, plano.length ? (cumprido != null ? 'feito ÷ planejado, de ' + dataCurta(jIni) + ' até hoje' : 'o plano ainda não começou') : null));
+
+      const caixa = el('div', { class: 'pxf' });
+      const t = dica(caixa);
+      const detalhe = (l) => {
+        t.text(''); t.append('b').text(ROTULO[l.t]);
+        const linha = (r, a, b) => t.append('div').text(r + ': ' + a + (plano.length ? ' de ' + b : ''));
+        linha('Tempo', horas(METRICAS.tempo.valor(l.f)), horas(METRICAS.tempo.valor(l.p)));
+        linha('Distância', METRICAS.distancia.fmt(METRICAS.distancia.valor(l.f)), METRICAS.distancia.fmt(METRICAS.distancia.valor(l.p)));
+        linha('TSS', fmt(METRICAS.tss.valor(l.f)), fmt(METRICAS.tss.valor(l.p)));
+        t.append('div').text(fmt(l.f.length) + ' feitos' + (plano.length ? ' · ' + fmt(l.p.length) + ' planejados' : ''));
+      };
+      caixa.append(
+        el('ul', { class: 'legenda' }, el('li', {}, el('i', { class: 'leg-feito' }), 'Feito'), el('li', {}, el('i', { class: 'leg-plano' }), 'Planejado')),
+        ...linhas.map((l) => {
+          const pct = l.pct;
+          const semKm = metricaAnalise === 'distancia' && l.t === 'Ride' && l.f.length && !kmConfiavel(l.f, 'Ride');
+          const linha = el('div', { class: 'pxf-linha', tabindex: '0' },
+            el('span', { class: 'pxf-esporte', text: ROTULO[l.t] }),
+            el('div', { class: 'pxf-barras' },
+              el('div', { class: 'pxf-barra feito', style: 'width:' + (l.vf / maior * 100).toFixed(2) + '%' }),
+              l.vp ? el('div', { class: 'pxf-barra plano', style: 'width:' + (l.vp / maior * 100).toFixed(2) + '%' }) : null),
+            el('span', { class: 'pxf-valor' }, el('b', { text: M.fmt(l.vf) }), l.vp ? ' de ' + M.fmt(l.vp) : '', pct != null ? el('em', { text: ' · ' + pct + '%' }) : null,
+              semKm ? el('small', { text: ' (pedais no rolo sem distância)' }) : null));
+          linha.addEventListener('pointerenter', (ev) => { detalhe(l); posDica(t, ev, caixa); });
+          linha.addEventListener('pointermove', (ev) => posDica(t, ev, caixa));
+          linha.addEventListener('pointerleave', () => t.style('opacity', 0));
+          return linha;
+        }));
+      const avisoPlano = plano.length ? null : el('p', { class: 'nota', text: 'Não há treinos planejados neste período, então só aparece o que foi feito. O planejado vem dos prints que você manda (config/planejados.json).' });
+
+      // divisão do tempo feito por esporte
+      const tempoTot = METRICAS.tempo.valor(feitos);
+      const cats = CATEGORIAS.map(([k, n, c]) => ({ n, c, min: soma(feitos.filter((a) => tipoDe(a) === k), (a) => a.tempo_min) })).filter((x) => x.min > 0);
+      const divisao = tempoTot ? el('div', { class: 'divisao' },
+        el('div', { class: 'divisao-barra', role: 'img', 'aria-label': 'Divisão do tempo: ' + cats.map((x) => x.n + ' ' + fmt(x.min / tempoTot * 100, 1) + '%').join(', ') },
+          cats.map((x) => el('i', { style: 'width:' + (x.min / tempoTot * 100).toFixed(2) + '%;background:' + x.c, title: x.n }))),
+        el('ul', { class: 'divisao-lista' }, cats.map((x) => el('li', {}, el('i', { style: 'background:' + x.c }), el('span', { text: x.n }),
+          el('b', { text: fmt(x.min / tempoTot * 100, 1) + '%' }), el('span', { class: 'h', text: horas(x.min) }))))) : el('p', { class: 'vazio', text: 'Nenhum treino neste período.' });
+
+      // calorias por semana
+      const semanas = [];
+      for (let s = segunda(de); s <= ate; s = somaDias(s, 7)) semanas.push(s);
+      const temCal = feitos.some((a) => a.calorias);
+      const linhasCal = semanas.map((s) => ({ chave: s, rotulo: 'Semana de ' + dataCurta(s), cal: soma(feitos.filter((a) => segunda(a.data) === s), (a) => a.calorias) }));
+      const boxCal = el('div', { class: 'grafico' });
+
+      corpo.replaceChildren(...[resumo,
+        secao('Planejado × feito por esporte', (plano.length ? 'Dias com plano: ' + dataCurta(jIni) + ' a ' + dataCurta(jFim) + '. ' : '') + 'Barra cheia: feito. Contorno: planejado (o plano inteiro). A porcentagem conta só os dias que já passaram. Passe o mouse para ver tempo, distância e TSS juntos.', caixa, avisoPlano),
+        secao('Divisão do tempo feito', null, divisao),
+        secao('Calorias por semana', temCal ? 'Gasto estimado pelo Garmin em cada semana do período.' : null,
+          temCal ? boxCal : el('p', { class: 'vazio', text: 'As calorias passam a aparecer depois da próxima sincronização.' }))]);
+      if (temCal && semanas.length) agendar(boxCal, () => barrasEmpilhadas(boxCal, linhasCal, { unidade: 'kcal', esportes: ['cal'], nomes: { cal: 'Calorias' }, fmtX: dataCurta, alt: 'Barras com as calorias gastas em cada semana do período' }));
+    }
+    desenhar();
+    $('#conteudo').replaceChildren(frag);
+  }
+
   // ---------- navegação ----------
   function rotear(ctx) {
     desenhos = [];
     const alvo = location.hash.slice(1);
     const prova = ctx.provas.find((p) => 'prova-' + p.id === alvo);
-    const atual = prova ? alvo : ['recuperacao', 'calendario'].includes(alvo) ? alvo : 'inicio';
+    const atual = prova ? alvo : ['recuperacao', 'calendario', 'analise'].includes(alvo) ? alvo : 'inicio';
     document.querySelectorAll('#abas a').forEach((a) => { if (a.getAttribute('href') === '#' + atual) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     if (prova) { document.title = prova.nome + ' · ' + ctx.site.nome; paginaProva(ctx, prova); }
+    else if (atual === 'analise') { document.title = 'Análise · ' + ctx.site.nome; paginaAnalise(ctx); }
     else if (atual === 'calendario') { document.title = 'Calendário · ' + ctx.site.nome; paginaCalendario(ctx); }
     else if (atual === 'recuperacao') { document.title = 'Recuperação · ' + ctx.site.nome; paginaRecuperacao(ctx); }
     else { document.title = ctx.site.nome; paginaInicio(ctx); }
@@ -833,9 +963,15 @@
       $('#abas').replaceChildren(
         el('a', { href: '#inicio', text: 'Início' }),
         el('a', { href: '#calendario', text: 'Calendário' }),
+        el('a', { href: '#analise', text: 'Análise' }),
         ...ativas.map((p) => el('a', { href: '#prova-' + p.id, text: p.nome.replace(/^IRONMAN /i, '') })),
         el('a', { href: '#recuperacao', text: 'Recuperação' }));
       if (meta.exemplo) { $('#aviso').hidden = false; $('#aviso').textContent = 'Estes são dados de exemplo. Eles serão trocados pelos seus na primeira sincronização com o Intervals.icu.'; }
+      // a sincronização roda todo dia às 6h de Manaus; mais de 36 horas sem atualizar indica que ela falhou
+      else if (meta.atualizado_em && Date.now() - new Date(meta.atualizado_em) > 36 * 3600e3) {
+        $('#aviso').hidden = false;
+        $('#aviso').textContent = 'Os dados não são atualizados desde ' + new Date(meta.atualizado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + '. A sincronização automática pode ter falhado: veja a aba Actions do repositório no GitHub.';
+      }
       if (meta.atualizado_em) $('#rodape').textContent = 'Dados do Garmin via ' + (meta.fonte || 'Intervals.icu') + '. Atualizado em ' + new Date(meta.atualizado_em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) + '.';
 
       window.addEventListener('hashchange', () => rotear(ctx));
