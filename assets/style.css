@@ -1,6 +1,6 @@
 :root{
-  --preto:#000; --branco:#fff; --cinza-1:#1c1c1c; --cinza-2:#3a3a3a; --cinza-3:#7d7d7d; --cinza-4:#bdbdbd;
-  --vermelho:#e8202a; --azul:#3d8bff;
+  --preto:#000; --branco:#fff; --cinza-1:#232429; --cinza-2:#393a3f; --cinza-3:#919297; --cinza-4:#c1c2c7;
+  --vermelho:#dc2323; --azul:#004eff;
   --fonte:"Archivo","Helvetica Neue",Arial,sans-serif;
   color-scheme:dark;
 }
@@ -122,7 +122,7 @@ td.n,th.n{text-align:right}
 .filtros{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
 .filtro{font:inherit;font-size:14px;font-weight:600;color:var(--cinza-3);background:none;border:1px solid var(--cinza-2);border-radius:999px;padding:7px 14px;cursor:pointer}
 .filtro:hover{color:var(--branco);border-color:var(--cinza-3)}
-.filtro[aria-pressed=true]{color:var(--preto);background:var(--azul);border-color:var(--azul)}
+.filtro[aria-pressed=true]{color:var(--branco);background:var(--azul);border-color:var(--azul)}
 .filtro.mais{margin-top:14px}
 .divisao{margin:22px 0 26px}
 .divisao-barra{display:flex;height:14px;border:1px solid var(--cinza-2)}
@@ -172,7 +172,7 @@ td.n,th.n{text-align:right}
 .t-Run{--hd:#fff;--hdt:#000}
 .t-Ride{--hd:#bdbdbd;--hdt:#000}
 .t-Swim{--hd:#7d7d7d;--hdt:#fff}
-.t-Strength{--hd:#3a3a3a;--hdt:#fff}
+.t-Strength{--hd:#393a3f;--hdt:#fff}
 .t-Other{--hd:#2a2a2a;--hdt:#fff}
 @media (max-width:900px){
   .calendario{width:auto;left:0;transform:none}
@@ -250,7 +250,7 @@ img{max-width:100%}
 .geo{border:1px solid var(--cinza-2);background:#050505}
 .geo-mapa{height:clamp(320px,52vw,520px);background:#0b0b0b}
 .geo-mapa .leaflet-container,.geo-mapa{font-family:var(--fonte)}
-.geo-ponto{display:flex!important;align-items:center;justify-content:center;border-radius:50%;background:rgba(232,32,42,.92);color:#fff;font-weight:800;font-size:12px;box-shadow:0 0 0 4px rgba(232,32,42,.25)}
+.geo-ponto{display:flex!important;align-items:center;justify-content:center;border-radius:50%;background:rgba(220,35,35,.92);color:#fff;font-weight:800;font-size:12px;box-shadow:0 0 0 4px rgba(220,35,35,.25)}
 .geo-fatos{padding:14px 18px 18px;border-top:1px solid var(--cinza-2)}
 .geo-rot{margin:10px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--cinza-3)}
 .geo-linha{margin:0;display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;color:var(--cinza-4);font-variant-numeric:tabular-nums}

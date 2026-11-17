@@ -4,9 +4,9 @@
 
   const ESPORTES = {
     Swim: { nome: 'Natação', cor: '#ffffff' },
-    Ride: { nome: 'Bike', cor: '#3d8bff' },
-    Run: { nome: 'Corrida', cor: '#e8202a' },
-    Strength: { nome: 'Musculação', cor: '#6a6a6a' },
+    Ride: { nome: 'Bike', cor: '#004eff' },
+    Run: { nome: 'Corrida', cor: '#dc2323' },
+    Strength: { nome: 'Musculação', cor: '#75767b' },
   };
   const ORDEM = ['Swim', 'Ride', 'Run'];
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -55,10 +55,10 @@
   }
   function eixos(svg, x, y, W, H, m, fmtX, fmtY, valoresX) {
     const ya = svg.append('g').attr('transform', `translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(fmtY || ((v) => v)));
-    ya.select('.domain').remove(); ya.selectAll('line').attr('stroke', '#1c1c1c');
+    ya.select('.domain').remove(); ya.selectAll('line').attr('stroke', '#232429');
     const eixoX = x.bandwidth ? d3.axisBottom(x).tickValues(valoresX) : d3.axisBottom(x).ticks(Math.max(2, Math.floor((W - m.l) / 70)));
     const xa = svg.append('g').attr('transform', `translate(0,${H - m.b})`).call(eixoX.tickFormat(fmtX).tickSize(0).tickPadding(8));
-    xa.select('.domain').attr('stroke', '#3a3a3a');
+    xa.select('.domain').attr('stroke', '#393a3f');
   }
 
   // Barras empilhadas por esporte. linhas: [{chave, rotulo, Swim, Ride, Run}]
@@ -72,13 +72,13 @@
     const y = d3.scaleLinear().domain([0, Math.max(topo, meta || 0) * 1.08]).nice().range([H - m.b, m.t]);
     const passo = Math.ceil(linhas.length / Math.max(2, Math.floor((W - m.l) / 46)));
     eixos(svg, x, y, W, H, m, fmtX, null, linhas.map((l) => l.chave).filter((_, i) => i % passo === 0));
-    svg.append('g').selectAll('g').data(pilha).join('g').attr('fill', (s) => esportes.length === 1 ? '#3d8bff' : ESPORTES[s.key].cor)
+    svg.append('g').selectAll('g').data(pilha).join('g').attr('fill', (s) => esportes.length === 1 ? '#004eff' : ESPORTES[s.key].cor)
       .selectAll('rect').data((s) => s).join('rect')
       .attr('x', (d) => x(d.data.chave)).attr('width', x.bandwidth())
       .attr('y', (d) => y(d[1])).attr('height', (d) => Math.max(0, y(d[0]) - y(d[1])));
     if (meta) {
-      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(meta)).attr('y2', y(meta)).attr('stroke', '#e8202a').attr('stroke-dasharray', '4 4');
-      svg.append('text').attr('x', W - m.r).attr('y', y(meta) - 6).attr('text-anchor', 'end').style('fill', '#e8202a')
+      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(meta)).attr('y2', y(meta)).attr('stroke', '#dc2323').attr('stroke-dasharray', '4 4');
+      svg.append('text').attr('x', W - m.r).attr('y', y(meta) - 6).attr('text-anchor', 'end').style('fill', '#dc2323')
         .attr('stroke', '#000').attr('stroke-width', 4).attr('paint-order', 'stroke').text('meta ' + fmt(meta) + ' ' + unidade);
     }
     const t = dica(box);
@@ -225,7 +225,7 @@
   }
 
   // atividades recentes com filtros de período
-  const CATEGORIAS = [['Run', 'Corrida', '#e8202a'], ['Ride', 'Bike', '#3d8bff'], ['Swim', 'Natação', '#ffffff'], ['Strength', 'Musculação', '#6a6a6a'], ['Other', 'Outros', '#3a3a3a']];
+  const CATEGORIAS = [['Run', 'Corrida', '#dc2323'], ['Ride', 'Bike', '#004eff'], ['Swim', 'Natação', '#ffffff'], ['Strength', 'Musculação', '#75767b'], ['Other', 'Outros', '#393a3f']];
   function atividadesRecentes(atividades) {
     const h = hojeISO(), seg = segunda(h);
     const periodos = [
@@ -481,7 +481,7 @@
     const b1 = el('div', { class: 'grafico' }), b2 = el('div', { class: 'grafico' }), b3 = el('div', { class: 'grafico' });
     const leg = (itens) => el('ul', { class: 'legenda' }, itens.map(([estilo, t]) => el('li', {}, el('i', { style: estilo }), t)));
     frag.append(secao('Fitness, fadiga e forma', 'Fitness é a carga média dos últimos 42 dias, fadiga a dos últimos 7. Forma é a diferença: negativa quando você está carregado.',
-      leg([['background:#fff', 'Fitness'], ['background:transparent;border-top:2px dashed #e8202a;height:0', 'Fadiga'], ['background:#3a3a3a', 'Forma']]), b1));
+      leg([['background:#fff', 'Fitness'], ['background:transparent;border-top:2px dashed #dc2323;height:0', 'Fadiga'], ['background:#393a3f', 'Forma']]), b1));
     frag.append(secao('HRV noturno', 'Cada ponto é uma noite. A linha é a média de 7 dias.', b2));
     frag.append(secao('Horas de sono', 'Barras brancas: noites com ' + metaSono + ' horas ou mais. A linha tracejada marca a meta.', b3));
     $('#conteudo').replaceChildren(frag);
@@ -491,9 +491,9 @@
       dicaTexto: (d) => ['Fitness ' + fmt(d.ctl, 1), 'Fadiga ' + fmt(d.atl, 1), 'Forma ' + fmt(d.forma, 1)],
       desenhar: (svg, dados, x, y) => {
         const bw = Math.max(1, (x.range()[1] - x.range()[0]) / dados.length - 1);
-        svg.append('g').selectAll('rect').data(dados.filter((d) => d.forma != null)).join('rect').attr('fill', '#3a3a3a')
+        svg.append('g').selectAll('rect').data(dados.filter((d) => d.forma != null)).join('rect').attr('fill', '#393a3f')
           .attr('x', (d) => x(d.t) - bw / 2).attr('width', bw).attr('y', (d) => Math.min(y(0), y(d.forma))).attr('height', (d) => Math.abs(y(0) - y(d.forma)));
-        linha(svg, dados, x, y, 'atl', '#e8202a', true); linha(svg, dados, x, y, 'ctl', '#fff');
+        linha(svg, dados, x, y, 'atl', '#dc2323', true); linha(svg, dados, x, y, 'ctl', '#fff');
       },
     }));
     agendar(b2, () => linhasTempo(b2, serie.filter((d) => d.hrv != null), {
@@ -501,7 +501,7 @@
       dicaTexto: (d) => ['HRV ' + fmt(d.hrv) + ' ms', 'Média 7 dias ' + fmt(d.hrv7, 1) + ' ms'],
       desenhar: (svg, dados, x, y) => {
         svg.append('g').selectAll('circle').data(dados).join('circle').attr('cx', (d) => x(d.t)).attr('cy', (d) => y(d.hrv)).attr('r', 2.5).attr('fill', '#5a5a5a');
-        linha(svg, dados, x, y, 'hrv7', '#3d8bff');
+        linha(svg, dados, x, y, 'hrv7', '#004eff');
       },
     }));
     agendar(b3, () => linhasTempo(b3, serie.filter((d) => d.sono_h != null), {
@@ -510,8 +510,8 @@
       desenhar: (svg, dados, x, y) => {
         const bw = Math.max(1, (x.range()[1] - x.range()[0]) / dados.length - 1);
         svg.append('g').selectAll('rect').data(dados).join('rect').attr('x', (d) => x(d.t) - bw / 2).attr('width', bw)
-          .attr('y', (d) => y(d.sono_h)).attr('height', (d) => y(0) - y(d.sono_h)).attr('fill', (d) => d.sono_h >= metaSono ? '#3d8bff' : '#4a4a4a');
-        svg.append('line').attr('x1', x.range()[0]).attr('x2', x.range()[1]).attr('y1', y(metaSono)).attr('y2', y(metaSono)).attr('stroke', '#e8202a').attr('stroke-dasharray', '4 4');
+          .attr('y', (d) => y(d.sono_h)).attr('height', (d) => y(0) - y(d.sono_h)).attr('fill', (d) => d.sono_h >= metaSono ? '#004eff' : '#55565b');
+        svg.append('line').attr('x1', x.range()[0]).attr('x2', x.range()[1]).attr('y1', y(metaSono)).attr('y2', y(metaSono)).attr('stroke', '#dc2323').attr('stroke-dasharray', '4 4');
       },
     }));
   }
@@ -539,7 +539,7 @@
   const ESTILO_GLOBO = {
     version: 8,
     projection: { type: 'globe' },
-    sky: { 'sky-color': '#000000', 'horizon-color': '#3a3a3a', 'fog-color': '#1c1c1c', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
+    sky: { 'sky-color': '#000000', 'horizon-color': '#393a3f', 'fog-color': '#232429', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0] },
     sources: { osm: { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' } },
     layers: [
       { id: 'fundo', type: 'background', paint: { 'background-color': '#000' } },
@@ -633,8 +633,8 @@
       aviso.textContent = 'O percurso não mostra os primeiros nem os últimos 500 m, por privacidade.';
       const linha = { type: 'Feature', geometry: { type: 'LineString', coordinates: rota.map((p) => [p[1], p[0]]) } };
       map.addSource('rota', { type: 'geojson', data: linha });
-      map.addLayer({ id: 'rota-brilho', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#e8202a', 'line-width': 9, 'line-opacity': 0.18, 'line-blur': 4 } });
-      map.addLayer({ id: 'rota', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#e8202a', 'line-width': 3 } });
+      map.addLayer({ id: 'rota-brilho', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#dc2323', 'line-width': 9, 'line-opacity': 0.18, 'line-blur': 4 } });
+      map.addLayer({ id: 'rota', type: 'line', source: 'rota', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#dc2323', 'line-width': 3 } });
       const lats = rota.map((p) => p[0]), lngs = rota.map((p) => p[1]);
       map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50, pitch: 45, duration: 1800, maxZoom: 15 });
     }
